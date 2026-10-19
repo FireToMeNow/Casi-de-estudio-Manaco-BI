@@ -12,7 +12,7 @@
     currency: ['moneda', 'currency', 'divisa']
   };
 
-  const worldLabels = new Set(['mundo', 'world', 'total mundo', 'total mundial', 'world total', 'total world', 'global', 'resto del mundo']);
+  const worldLabels = new Set(['mundo', 'mundo total', 'total mundo', 'total mundial', 'world', 'world total', 'total world', 'world aggregate', 'global', 'resto del mundo', 'rest of world']);
 
   function normalize(value) {
     return String(value ?? '')
@@ -107,8 +107,18 @@
     if (typeof value === 'number' && Number.isInteger(value) && value >= 1000 && value <= 9999) return String(value);
     const text = String(value ?? '').trim();
     if (/^\d{4}$/.test(text)) return text;
-    if (/^\d{4}[-/]\d{1,2}$/.test(text)) return text.replace('/', '-').replace(/-(\d)$/, '-0$1');
-    if (/^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/.test(text)) return text.replaceAll('/', '-');
+    const month = text.match(/^(\d{4})[-/](\d{1,2})$/);
+    if (month && Number(month[2]) >= 1 && Number(month[2]) <= 12) return `${month[1]}-${month[2].padStart(2, '0')}`;
+    const date = text.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+    if (date) {
+      const year = Number(date[1]);
+      const monthNumber = Number(date[2]);
+      const day = Number(date[3]);
+      const parsedDate = new Date(Date.UTC(year, monthNumber - 1, day));
+      if (parsedDate.getUTCFullYear() === year && parsedDate.getUTCMonth() === monthNumber - 1 && parsedDate.getUTCDate() === day) {
+        return `${date[1]}-${date[2].padStart(2, '0')}-${date[3].padStart(2, '0')}`;
+      }
+    }
     if (/^\d{4}[- ]?Q[1-4]$/i.test(text)) return text.toUpperCase().replace(' ', '-');
     return null;
   }
@@ -148,11 +158,24 @@
       if (schema.period && filters.period && normalizePeriod(row[schema.period.index]) !== filters.period) return false;
       return true;
     });
-    const worldRows = schema.country ? filterMatches.filter(({ row }) => isWorld(row[schema.country.index])) : [];
+    const reportingCountryValues = schema.reportingCountry
+      ? new Set(filterMatches.map(({ row }) => String(row[schema.reportingCountry.index] ?? '').trim()).filter(Boolean))
+      : new Set();
+    const reportingRoleAmbiguous = schema.ambiguities.some((ambiguity) => ambiguity.role === 'reportingCountry');
+    const reportingScopeAllowed = !reportingRoleAmbiguous &&
+      (!schema.reportingCountry || Boolean(filters.reportingCountry) || reportingCountryValues.size <= 1);
     const worldMode = filters.worldMode === 'world' ? 'world' : 'detailed';
+    const ambiguousCountryHeaders = schema.ambiguities.find((ambiguity) => ambiguity.role === 'country')?.headers ?? [];
+    const countryCandidateIndexes = schema.country
+      ? [schema.country.index]
+      : headers.flatMap((header, index) => ambiguousCountryHeaders.includes(String(header ?? '')) ? [index] : []);
+    const isWorldRecord = (row) => countryCandidateIndexes.some((index) => isWorld(row[index]));
+    const countryRoleAmbiguous = schema.ambiguities.some((ambiguity) => ambiguity.role === 'country');
+    const worldScopeAllowed = !countryRoleAmbiguous || worldMode === 'world';
+    const worldRows = countryCandidateIndexes.length ? filterMatches.filter(({ row }) => isWorldRecord(row)) : [];
     const scopedRows = filterMatches.filter(({ row }) => worldMode === 'world'
-      ? schema.country && isWorld(row[schema.country.index])
-      : !schema.country || !isWorld(row[schema.country.index]));
+      ? isWorldRecord(row)
+      : !isWorldRecord(row));
 
     const duplicateCounts = new Map();
     for (const { row } of scopedRows) {
@@ -198,12 +221,12 @@
     const validRecords = flowRecords.filter((record) => record.flow && record.value !== null);
     const comparableUnit = unitStatus === 'known';
     const metricsAvailable = Boolean(schema.flow && schema.value);
-    const canAggregateValues = metricsAvailable && unitStatus !== 'mixed' && unitStatus !== 'incomplete';
+    const canAggregateValues = metricsAvailable && reportingScopeAllowed && worldScopeAllowed && unitStatus !== 'mixed' && unitStatus !== 'incomplete';
     const canCompareFlows = canAggregateValues && !filters.flow;
     const totalByFlow = (records) => records.reduce((sum, record) => sum + (record.value ?? 0), 0);
-    const importTotal = metricsAvailable && importRecords.some((record) => record.value !== null) && unitStatus !== 'mixed' && unitStatus !== 'incomplete'
+    const importTotal = metricsAvailable && reportingScopeAllowed && worldScopeAllowed && importRecords.some((record) => record.value !== null) && unitStatus !== 'mixed' && unitStatus !== 'incomplete'
       ? totalByFlow(importRecords.filter((record) => record.value !== null)) : null;
-    const exportTotal = metricsAvailable && exportRecords.some((record) => record.value !== null) && unitStatus !== 'mixed' && unitStatus !== 'incomplete'
+    const exportTotal = metricsAvailable && reportingScopeAllowed && worldScopeAllowed && exportRecords.some((record) => record.value !== null) && unitStatus !== 'mixed' && unitStatus !== 'incomplete'
       ? totalByFlow(exportRecords.filter((record) => record.value !== null)) : null;
     const includedRecords = canAggregateValues ? validRecords.length : 0;
 
@@ -275,7 +298,7 @@
     const pairCandidateRecords = pairScopeRecords.filter((record) => record.value !== null && record.pairs !== null && record.pairs > 0);
     const pairPeriods = new Set(pairScopeRecords.map((record) => record.period));
     const pairPeriodComparable = Boolean(schema.period && pairScopeRecords.length && pairScopeRecords.every((record) => record.period !== null) && pairPeriods.size === 1);
-    const pairCalculationAvailable = comparableUnit && schema.pairsCompatible && pairPeriodComparable;
+    const pairCalculationAvailable = reportingScopeAllowed && worldScopeAllowed && comparableUnit && schema.pairsCompatible && pairPeriodComparable;
     const pairRatio = (records) => {
       const pairRecords = records.filter((record) => record.value !== null && record.pairs !== null && record.pairs > 0);
       return pairCalculationAvailable && pairRecords.length
@@ -335,11 +358,16 @@
       valuePerPair: pairValue,
       partners,
       timeSeries,
+      recordsIncluded: canAggregateValues ? validRecords : [],
       recordsByPartnerAndFlow,
       validRecords,
       worldRows: worldRows.map(({ row, sourceRow }) => ({ row, sourceRow })),
       diagnostics: {
         hasFlow: Boolean(schema.flow),
+        reportingScopeAllowed,
+        reportingRoleAmbiguous,
+        worldScopeAllowed,
+        countryRoleAmbiguous,
         hasValue: Boolean(schema.value),
         hasCountry: Boolean(schema.country),
         hasProduct: Boolean(schema.product),
@@ -429,7 +457,7 @@
     return findings;
   }
 
-  const api = { analyzeMarket, classifyFlow, generateFindings, getFilterOptions, isWorld, normalizePeriod, parseNumber, resolveSchema };
+  const api = { analyzeMarket, classifyFlow, currencyFromText, generateFindings, getFilterOptions, isWorld, normalizePeriod, parseNumber, resolveSchema, scaleFromText };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.MarketAnalysis = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

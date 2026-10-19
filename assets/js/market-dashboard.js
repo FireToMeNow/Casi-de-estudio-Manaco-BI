@@ -3,6 +3,7 @@
 
   const analysis = window.MarketAnalysis;
   const state = { getDataset: null, charts: {}, result: null, initialized: false };
+  let datasetKey = null;
   const filterRoles = ['period', 'reportingCountry', 'country', 'flow', 'product'];
   const roleLabels = {
     reportingCountry: 'País reportante',
@@ -91,6 +92,9 @@
     else if (result.totals.importRecords === 0 && result.totals.exportRecords === 0) messages.push('No hay registros con flujo y valor numérico reconocidos en el alcance actual.');
     else if (result.totals.importRecords === 0 || result.totals.exportRecords === 0) messages.push(`No se detectaron registros válidos de ${result.totals.importRecords === 0 ? 'importación' : 'exportación'} en el alcance actual; no se calcula el saldo comercial.`);
     if (result.schema.ambiguities.length) messages.push(`Hay roles ambiguos (${result.schema.ambiguities.map((item) => roleLabels[item.role] || item.role).join(', ')}); revisa los encabezados. No se eligió una columna arbitrariamente.`);
+    if (result.diagnostics.reportingRoleAmbiguous) messages.push('No se calculan indicadores porque hay varias columnas candidatas para el país reportante.');
+    if (!result.diagnostics.reportingScopeAllowed) messages.push('Se detectaron varios países reportantes. Selecciona uno para evitar sumar flujos de países distintos.');
+    if (result.diagnostics.countryRoleAmbiguous && result.filters.worldMode !== 'world') messages.push('Hay columnas ambiguas de país socio; se bloquean los totales hasta revisar los encabezados. Las filas «Mundo» siguen excluidas.');
     if (result.units.status === 'unknown' && result.diagnostics.hasValue) messages.push('La moneda o unidad no está identificada. Se muestran sumas separadas por flujo, pero no saldo, valor por par ni gráficos comparativos.');
     if (result.units.status === 'mixed' || result.units.status === 'incomplete') messages.push('Se detectaron monedas distintas o datos de moneda ausentes. No se agregan importes entre monedas ni se calcula saldo.');
     if (!result.periods.comparable && result.totals.importRecords && result.totals.exportRecords) messages.push('Los periodos de importación y exportación no tienen la misma cobertura reconocida. Se muestran por separado, sin saldo ni ranking combinado de socios.');
@@ -272,7 +276,7 @@
   }
 
   function renderRecordsTable(dataset, result) {
-    const records = result.validRecords;
+    const records = result.recordsIncluded;
     $('market-table-count').textContent = `${records.length} registros · muestra máxima 100`;
     $('market-records-table').querySelector('thead').innerHTML = `<tr><th>Fila</th>${dataset.headers.map((header) => `<th>${escapeHtml(header || '(sin encabezado)')}</th>`).join('')}</tr>`;
     $('market-records-table').querySelector('tbody').innerHTML = records.slice(0, 100).map((record) => `<tr><td>${record.sourceRow}</td>${record.row.map((value) => `<td title="${escapeHtml(value instanceof Date ? value.toISOString() : value)}">${escapeHtml(value instanceof Date ? value.toISOString().slice(0, 10) : value)}</td>`).join('')}</tr>`).join('');
@@ -309,10 +313,17 @@
       $('market-source').textContent = 'El análisis usará la hoja activa de Preparación de datos.';
       destroyAllCharts();
       state.result = null;
+      datasetKey = null;
       return;
     }
     $('market-empty').hidden = true;
     $('market-workspace').hidden = false;
+    const nextDatasetKey = dataset.result;
+    if (datasetKey !== null && datasetKey !== nextDatasetKey) {
+      for (const role of filterRoles) $(`market-${role}-filter`).value = '';
+      $('market-world-filter').value = 'detailed';
+    }
+    datasetKey = nextDatasetKey;
     $('market-source').textContent = `${dataset.fileName} · hoja ${dataset.sheetName} · ${dataset.result.rowCount} registros no vacíos`;
     syncFilterOptions(dataset);
     const result = analysis.analyzeMarket(dataset.headers, dataset.rows, getFilters(), dataset.firstDataRowNumber);
@@ -371,7 +382,7 @@
     ]), 'Periodos');
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
       ['Fila origen', ...dataset.headers],
-      ...result.validRecords.map((record) => [record.sourceRow, ...record.row])
+      ...result.recordsIncluded.map((record) => [record.sourceRow, ...record.row])
     ]), 'Registros incluidos');
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
       ['Rol analítico', 'Columna detectada'],

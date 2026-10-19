@@ -30,6 +30,7 @@ function createElement() {
 function dashboardHarness(initialDataset) {
   const elements = new Map();
   const charts = [];
+  const exports = [];
   const document = {
     getElementById(id) {
       if (!elements.has(id)) elements.set(id, createElement());
@@ -47,8 +48,16 @@ function dashboardHarness(initialDataset) {
       this.destroyed = true;
     }
   }
-  const window = { MarketAnalysis, Chart };
-  const context = { document, window, Chart, Intl, Number, Set, Map, JSON, String, Math };
+  const XLSX = {
+    utils: {
+      book_new: () => ({ sheets: [] }),
+      aoa_to_sheet: (rows) => rows,
+      book_append_sheet: (workbook, sheet, name) => workbook.sheets.push({ name, sheet })
+    },
+    writeFile: (workbook, fileName) => exports.push({ workbook, fileName })
+  };
+  const window = { MarketAnalysis, Chart, XLSX };
+  const context = { document, window, Chart, XLSX, Intl, Number, Set, Map, JSON, String, Math };
   vm.runInNewContext(fs.readFileSync(require.resolve('../assets/js/market-dashboard.js'), 'utf8'), context);
   let dataset = initialDataset;
   window.MarketDashboard.initialize(() => dataset);
@@ -56,6 +65,7 @@ function dashboardHarness(initialDataset) {
   return {
     elements,
     charts,
+    exports,
     setDataset(nextDataset) {
       dataset = nextDataset;
       window.MarketDashboard.refresh();
@@ -97,19 +107,45 @@ test('dashboard actualiza tarjetas, periodo, hallazgos y tablas con filtros y al
     chart.configuration.data.datasets[1].data[0] === 20));
   assert.ok(filteredCharts.some((chart) => chart.canvas === dashboard.elements.get('market-partner-chart') &&
     chart.configuration.data.labels.includes('Chile')));
+  dashboard.elements.get('market-export').listeners.click();
+  const includedSheet = dashboard.exports[0].workbook.sheets.find(({ name }) => name === 'Registros incluidos');
+  assert.equal(includedSheet.sheet.length, 3);
+  assert.ok(includedSheet.sheet.every((row) => !row.includes('España')));
 
-  const next = dataset('comercio-b.csv', 'Resumen', headers, [
-    ['Ecuador', 'Perú', 'Exportaciones', 45, '2026', 'Calzado deportivo']
+  const next = dataset('comercio-a.csv', 'Datos', headers, [
+    ['Bolivia', 'Perú', 'Importaciones', 15, '2026', 'Calzado deportivo'],
+    ['Bolivia', 'Ecuador', 'Exportaciones', 45, '2026', 'Calzado deportivo'],
+    ['España', 'Bolivia', 'Importaciones', 90, '2026', 'Sandalias']
   ]);
   dashboard.setDataset(next);
-  assert.match(dashboard.elements.get('market-source').textContent, /comercio-b\.csv · hoja Resumen/);
+  assert.match(dashboard.elements.get('market-source').textContent, /comercio-a\.csv · hoja Datos/);
   assert.match(dashboard.elements.get('market-analysis-period').textContent, /2026/);
-  assert.match(dashboard.elements.get('market-kpis').innerHTML, /45 USD/);
-  assert.match(dashboard.elements.get('market-findings-list').innerHTML, /Perú/);
-  assert.match(dashboard.elements.get('market-records-table').querySelector('tbody').innerHTML, /Calzado deportivo/);
+  assert.match(dashboard.elements.get('market-kpis').innerHTML, /No disponible/);
+  assert.match(dashboard.elements.get('market-alerts').innerHTML, /Selecciona uno/);
+  assert.doesNotMatch(dashboard.elements.get('market-records-table').querySelector('tbody').innerHTML, /Calzado deportivo/);
   assert.doesNotMatch(dashboard.elements.get('market-records-table').querySelector('tbody').innerHTML, /Argentina/);
+  assert.match(dashboard.elements.get('market-counts').innerHTML, /Incluidos en indicadores<\/span><strong>0/);
+  reporterFilter.value = 'Bolivia';
+  reporterFilter.listeners.change();
+  assert.match(dashboard.elements.get('market-kpis').innerHTML, /15 USD/);
+  assert.match(dashboard.elements.get('market-findings-list').innerHTML, /Ecuador/);
+  assert.match(dashboard.elements.get('market-records-table').querySelector('tbody').innerHTML, /Calzado deportivo/);
+  assert.match(dashboard.elements.get('market-counts').innerHTML, /Tras filtros<\/span><strong>2/);
   const replacementCharts = dashboard.charts.filter((chart) => !chart.destroyed);
   assert.ok(replacementCharts.some((chart) => chart.canvas === dashboard.elements.get('market-period-chart') &&
     chart.configuration.data.labels.includes('2026') &&
     chart.configuration.data.datasets.some((series) => series.data.includes(45))));
+});
+
+test('dashboard no presenta filas como incluidas cuando las monedas son incompatibles', () => {
+  const source = dataset('monedas.csv', 'Datos', ['País', 'Flujo', 'Valor', 'Moneda'], [
+    ['Chile', 'Importaciones', 10, 'USD'],
+    ['Perú', 'Exportaciones', 20, 'EUR']
+  ]);
+  const dashboard = dashboardHarness(source);
+  assert.match(dashboard.elements.get('market-counts').innerHTML, /Incluidos en indicadores<\/span><strong>0/);
+  assert.equal(dashboard.elements.get('market-records-table').querySelector('tbody').innerHTML, '');
+  dashboard.elements.get('market-export').listeners.click();
+  const includedSheet = dashboard.exports[0].workbook.sheets.find(({ name }) => name === 'Registros incluidos');
+  assert.equal(includedSheet.sheet.length, 1);
 });

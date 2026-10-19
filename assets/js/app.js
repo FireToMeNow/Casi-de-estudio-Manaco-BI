@@ -4,7 +4,7 @@
   const analysis = window.DataAnalysis;
   const state = { workbook: null, fileName: '', sheetName: '', headers: [], rows: [], result: null, sourceRowStart: 2 };
   const elements = {};
-  const pendingTitles = {
+  const moduleTitles = {
     inventarios: 'Inventarios',
     pronosticos: 'Pronósticos',
     rentabilidad: 'Rentabilidad'
@@ -15,7 +15,7 @@
   }
 
   function cacheElements() {
-    ['file-input', 'browse-button', 'drop-zone', 'error-banner', 'dataset-panel', 'file-name', 'file-meta', 'sheet-control', 'sheet-select', 'replace-button', 'stats-strip', 'preview-table', 'preview-count', 'preview-range', 'column-mapping', 'findings-content', 'diagnostic-state', 'diagnostics-empty', 'diagnostics-content', 'diagnostic-metrics', 'column-diagnostics', 'export-button', 'report-button', 'quality-summary', 'breadcrumb-current', 'pending-title', 'footer-stage', 'stage-tag'].forEach((id) => { elements[id] = byId(id); });
+    ['file-input', 'browse-button', 'drop-zone', 'error-banner', 'dataset-panel', 'file-name', 'file-meta', 'sheet-control', 'sheet-select', 'replace-button', 'stats-strip', 'preview-table', 'preview-count', 'preview-range', 'column-mapping', 'findings-content', 'diagnostic-state', 'diagnostics-empty', 'diagnostics-content', 'diagnostic-metrics', 'column-diagnostics', 'export-button', 'report-button', 'quality-summary', 'breadcrumb-current', 'footer-stage', 'stage-tag'].forEach((id) => { elements[id] = byId(id); });
   }
 
   function escapeHtml(value) {
@@ -39,9 +39,8 @@
   }
 
   function setView(view) {
-    const page = pendingTitles[view] ? 'pendiente' : view;
     document.querySelectorAll('[data-page]').forEach((section) => {
-      const active = section.dataset.page === page;
+      const active = section.dataset.page === view;
       section.hidden = !active;
       section.classList.toggle('is-visible', active);
     });
@@ -51,13 +50,15 @@
       if (active) button.setAttribute('aria-current', 'page');
       else button.removeAttribute('aria-current');
     });
-    const labels = { inicio: 'Inicio', preparacion: 'Preparación de datos', calidad: 'Calidad de datos', mercado: 'Dashboard ejecutivo', ...pendingTitles };
+    const labels = { inicio: 'Inicio', preparacion: 'Preparación de datos', calidad: 'Calidad de datos', mercado: 'Dashboard ejecutivo', ...moduleTitles };
     elements['breadcrumb-current'].textContent = labels[view] || 'Preparación de datos';
-    elements['stage-tag'].textContent = view === 'mercado' ? 'ETAPA 03' : 'ETAPA 01';
-    elements['footer-stage'].textContent = view === 'mercado' ? 'ETAPA 03 · DASHBOARD SOBRE DATOS CARGADOS' : 'ETAPA 01 · SIN DATOS COMERCIALES PRECARGADOS';
-    if (pendingTitles[view]) elements['pending-title'].textContent = pendingTitles[view];
+    const stages = { mercado: 'ETAPA 03', inventarios: 'ETAPA 04', pronosticos: 'ETAPA 05', rentabilidad: 'ETAPA 06' };
+    const stage = stages[view] || 'ETAPA 01';
+    elements['stage-tag'].textContent = stage;
+    elements['footer-stage'].textContent = `${stage} · ${view === 'mercado' ? 'DASHBOARD EJECUTIVO' : moduleTitles[view] || 'PREPARACIÓN Y CALIDAD'}`;
     if (view === 'calidad') renderQualitySummary();
     if (view === 'mercado') window.MarketDashboard.refresh();
+    if (moduleTitles[view]) window.BusinessModules.render(view, getCurrentDataset());
   }
 
   function renderStats(result) {
@@ -260,7 +261,11 @@
   function bindEvents() {
     elements['browse-button'].addEventListener('click', () => elements['file-input'].click());
     elements['replace-button'].addEventListener('click', () => elements['file-input'].click());
-    elements['file-input'].addEventListener('change', (event) => loadFile(event.target.files[0]));
+    elements['file-input'].addEventListener('change', (event) => {
+      const file = event.target.files[0];
+      event.target.value = '';
+      loadFile(file);
+    });
     elements['sheet-select'].addEventListener('change', (event) => {
       try { renderSheet(event.target.value); clearError(); }
       catch (error) { showError(`No se pudo inspeccionar la hoja: ${error.message}`); }
@@ -280,15 +285,19 @@
 
   function init() {
     cacheElements();
-    window.MarketDashboard.initialize(() => state.result ? {
+    window.MarketDashboard.initialize(getCurrentDataset);
+    bindEvents();
+  }
+
+  function getCurrentDataset() {
+    return state.result ? {
       headers: state.headers,
       rows: state.rows,
       result: state.result,
       firstDataRowNumber: state.sourceRowStart,
       fileName: state.fileName,
       sheetName: state.sheetName
-    } : null);
-    bindEvents();
+    } : null;
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

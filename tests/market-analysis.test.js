@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { analyzeMarket, generateFindings, getFilterOptions, resolveSchema } = require('../assets/js/market-analysis.js');
+const { analyzeMarket, generateFindings, getFilterOptions, isWorld, normalizePeriod, resolveSchema } = require('../assets/js/market-analysis.js');
 
 const syntheticHeaders = ['País socio', 'Flujo comercial', 'Producto', 'Cantidad de pares', 'Valor USD', 'Periodo'];
 
@@ -41,11 +41,18 @@ test('datos sintéticos: separa país reportante y socio comercial en filtros y 
   assert.deepEqual(options.reportingCountry, ['Bolivia', 'España']);
   assert.deepEqual(options.country, ['Argentina', 'Bolivia', 'Chile']);
 
+  const unfiltered = analyzeMarket(headers, rows);
+  assert.equal(unfiltered.totals.import, null);
+  assert.equal(unfiltered.totals.export, null);
+  assert.equal(unfiltered.counts.included, 0);
+  assert.equal(unfiltered.diagnostics.reportingScopeAllowed, false);
+
   const result = analyzeMarket(headers, rows, { reportingCountry: 'Bolivia', country: 'Chile' });
   assert.equal(result.counts.afterFilters, 1);
   assert.equal(result.totals.import, null);
   assert.equal(result.totals.export, 150);
   assert.equal(result.totals.balance, null);
+  assert.equal(result.diagnostics.reportingScopeAllowed, true);
   assert.deepEqual(result.periods.analyzed, ['2024']);
 });
 
@@ -114,6 +121,14 @@ test('datos sintéticos: mantiene Mundo fuera del desglose y permite inspección
   assert.equal(worldOnly.counts.inScope, 1);
   assert.equal(worldOnly.totals.import, 900);
   assert.equal(worldOnly.totals.export, null);
+  assert.equal(isWorld('Mundo total'), true);
+});
+
+test('datos sintéticos: rechaza fechas y meses inválidos al normalizar periodos', () => {
+  assert.equal(normalizePeriod('2024-02'), '2024-02');
+  assert.equal(normalizePeriod('2024-13'), null);
+  assert.equal(normalizePeriod('2024-02-29'), '2024-02-29');
+  assert.equal(normalizePeriod('2023-02-29'), null);
 });
 
 test('datos sintéticos: no representa como cero un flujo sin observaciones', () => {
@@ -195,6 +210,19 @@ test('datos sintéticos: no trata cantidades expresadas en miles como pares indi
   assert.equal(result.valuePerPair, null);
 });
 
+test('datos sintéticos: valor por par usa valor y pares válidos de las mismas filas', () => {
+  const headers = ['País', 'Flujo', 'Valor USD', 'Cantidad de pares', 'Periodo'];
+  const rows = [
+    ['País A', 'Importaciones', 100, 2, '2024'],
+    ['País A', 'Importaciones', 900, '', '2024'],
+    ['País A', 'Exportaciones', 30, 1, '2024']
+  ];
+  const result = analyzeMarket(headers, rows);
+  assert.equal(result.valuePerPair, 130 / 3);
+  assert.equal(result.counts.pairIncluded, 2);
+  assert.equal(result.counts.pairExcluded, 1);
+});
+
 test('datos sintéticos: conserva la escala declarada en la unidad de valor', () => {
   const result = analyzeMarket(['País', 'Flujo', 'Valor USD en miles', 'Periodo'], [['País A', 'Importaciones', 12, '2024']]);
   assert.equal(result.units.label, 'USD (miles)');
@@ -211,4 +239,23 @@ test('datos sintéticos: rechaza roles ambiguos y textos numéricos con separado
   const commaAmbiguous = analyzeMarket(['País', 'Flujo', 'Valor USD'], [['País A', 'Importaciones', '1,234']]);
   assert.equal(commaAmbiguous.totals.import, null);
   assert.equal(commaAmbiguous.totals.missingValues, 1);
+});
+
+test('datos sintéticos: con país ambiguo excluye Mundo y bloquea agregados mixtos', () => {
+  const headers = ['País de origen', 'País de destino', 'Flujo', 'Valor USD'];
+  const rows = [
+    ['Bolivia', 'Chile', 'Importaciones', 100],
+    ['Bolivia', 'Mundo', 'Importaciones', 900]
+  ];
+  const detailed = analyzeMarket(headers, rows);
+  assert.equal(detailed.counts.worldCandidates, 1);
+  assert.equal(detailed.counts.worldExcluded, 1);
+  assert.equal(detailed.diagnostics.countryRoleAmbiguous, true);
+  assert.equal(detailed.diagnostics.worldScopeAllowed, false);
+  assert.equal(detailed.totals.import, null);
+  assert.equal(detailed.counts.included, 0);
+
+  const worldOnly = analyzeMarket(headers, rows, { worldMode: 'world' });
+  assert.equal(worldOnly.counts.inScope, 1);
+  assert.equal(worldOnly.totals.import, 900);
 });

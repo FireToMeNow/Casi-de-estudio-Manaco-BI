@@ -4,8 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#f5f5ef">
-    <meta name="description" content="Preparación y validación local de archivos comerciales para MANACO BI.">
-    <title>MANACO BI | Preparación de datos</title>
+    <meta name="description" content="Preparación local de datos, análisis comercial e indicadores de negocios para MANACO BI.">
+    <title>MANACO BI | Inteligencia de negocios</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
@@ -14,6 +14,7 @@
     <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
     <script defer src="assets/js/data-analysis.js"></script>
     <script defer src="assets/js/market-analysis.js"></script>
+    <script defer src="assets/js/business-modules.js"></script>
     <script defer src="assets/js/market-dashboard.js"></script>
     <script defer src="assets/js/app.js"></script>
   </head>
@@ -31,11 +32,11 @@
           <button class="nav-item" type="button" data-view="calidad"><span class="nav-icon" aria-hidden="true">◫</span>Calidad de datos</button>
           <button class="nav-item" type="button" data-view="mercado"><span class="nav-icon" aria-hidden="true">▥</span>Dashboard ejecutivo</button>
         </nav>
-        <div class="nav-label nav-label-spaced">SIGUIENTES ETAPAS</div>
-        <nav class="nav-list" aria-label="Módulos pendientes">
-          <button class="nav-item is-pending" type="button" data-view="inventarios"><span class="nav-icon" aria-hidden="true">▦</span>Inventarios<span class="pending-tag">Próximamente</span></button>
-          <button class="nav-item is-pending" type="button" data-view="pronosticos"><span class="nav-icon" aria-hidden="true">⌁</span>Pronósticos<span class="pending-tag">Próximamente</span></button>
-          <button class="nav-item is-pending" type="button" data-view="rentabilidad"><span class="nav-icon" aria-hidden="true">◷</span>Rentabilidad<span class="pending-tag">Próximamente</span></button>
+        <div class="nav-label nav-label-spaced">ANÁLISIS</div>
+        <nav class="nav-list" aria-label="Módulos de análisis">
+          <button class="nav-item" type="button" data-view="inventarios"><span class="nav-icon" aria-hidden="true">▦</span>Inventarios</button>
+          <button class="nav-item" type="button" data-view="pronosticos"><span class="nav-icon" aria-hidden="true">⌁</span>Pronósticos</button>
+          <button class="nav-item" type="button" data-view="rentabilidad"><span class="nav-icon" aria-hidden="true">◷</span>Rentabilidad</button>
         </nav>
         <div class="sidebar-foot"><span class="local-dot"></span>Procesamiento local<br><small>Los archivos no salen de este dispositivo</small></div>
       </aside>
@@ -145,7 +146,21 @@
             <details class="market-assumptions"><summary>Supuestos, cobertura y limitaciones</summary><ul id="market-assumptions-list"></ul></details>
           </div>
         </section>
-        <section class="page-view simple-view" data-page="pendiente" hidden><p class="eyebrow">MANACO BI · ETAPA FUTURA</p><h1 id="pending-title">Módulo pendiente</h1><p class="heading-subtitle">Esta funcionalidad no forma parte de la primera etapa y no presenta resultados.</p><button class="button button-secondary" type="button" data-go="preparacion">Volver a preparación →</button></section>
+        <section class="page-view module-view" data-page="inventarios" hidden>
+          <div class="page-heading"><div><p class="eyebrow">ANÁLISIS OPERATIVO · ETAPA 04</p><h1>Inventarios</h1><p class="heading-subtitle">Entradas, salidas y alertas calculadas solo si el archivo tiene columnas compatibles.</p></div><div class="market-source-tag"><span class="local-dot"></span>Datos locales</div></div>
+          <div id="inventarios-results" class="module-results" aria-live="polite"></div>
+          <button class="button button-secondary" type="button" data-go="preparacion">Volver a preparación de datos</button>
+        </section>
+        <section class="page-view module-view" data-page="pronosticos" hidden>
+          <div class="page-heading"><div><p class="eyebrow">ANÁLISIS TEMPORAL · ETAPA 05</p><h1>Pronósticos</h1><p class="heading-subtitle">Estimación de referencia disponible solo con historia anual suficiente y comparable.</p></div><div class="market-source-tag"><span class="local-dot"></span>Datos locales</div></div>
+          <div id="pronosticos-results" class="module-results" aria-live="polite"></div>
+          <button class="button button-secondary" type="button" data-go="preparacion">Volver a preparación de datos</button>
+        </section>
+        <section class="page-view module-view" data-page="rentabilidad" hidden>
+          <div class="page-heading"><div><p class="eyebrow">ANÁLISIS FINANCIERO · ETAPA 06</p><h1>Rentabilidad</h1><p class="heading-subtitle">Margen calculado únicamente con ingresos por ventas y costo de ventas compatibles.</p></div><div class="market-source-tag"><span class="local-dot"></span>Datos locales</div></div>
+          <div id="rentabilidad-results" class="module-results" aria-live="polite"></div>
+          <button class="button button-secondary" type="button" data-go="preparacion">Volver a preparación de datos</button>
+        </section>
         <footer class="page-footer"><span>MANACO BI <i></i> PREPARACIÓN Y VALIDACIÓN</span><span id="footer-stage">ETAPA 01 · SIN DATOS COMERCIALES PRECARGADOS</span></footer>
       </main>
     </div>
