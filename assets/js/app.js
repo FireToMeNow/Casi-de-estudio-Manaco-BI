@@ -5,7 +5,6 @@
   const state = { workbook: null, fileName: '', sheetName: '', headers: [], rows: [], result: null, sourceRowStart: 2 };
   const elements = {};
   const pendingTitles = {
-    mercado: 'Inteligencia de mercado',
     inventarios: 'Inventarios',
     pronosticos: 'Pronósticos',
     rentabilidad: 'Rentabilidad'
@@ -16,7 +15,7 @@
   }
 
   function cacheElements() {
-    ['file-input', 'browse-button', 'drop-zone', 'error-banner', 'dataset-panel', 'file-name', 'file-meta', 'sheet-control', 'sheet-select', 'replace-button', 'stats-strip', 'preview-table', 'preview-count', 'preview-range', 'column-mapping', 'findings-content', 'diagnostic-state', 'diagnostics-empty', 'diagnostics-content', 'diagnostic-metrics', 'column-diagnostics', 'export-button', 'report-button', 'quality-summary', 'breadcrumb-current', 'pending-title'].forEach((id) => { elements[id] = byId(id); });
+    ['file-input', 'browse-button', 'drop-zone', 'error-banner', 'dataset-panel', 'file-name', 'file-meta', 'sheet-control', 'sheet-select', 'replace-button', 'stats-strip', 'preview-table', 'preview-count', 'preview-range', 'column-mapping', 'findings-content', 'diagnostic-state', 'diagnostics-empty', 'diagnostics-content', 'diagnostic-metrics', 'column-diagnostics', 'export-button', 'report-button', 'quality-summary', 'breadcrumb-current', 'pending-title', 'footer-stage', 'stage-tag'].forEach((id) => { elements[id] = byId(id); });
   }
 
   function escapeHtml(value) {
@@ -52,10 +51,13 @@
       if (active) button.setAttribute('aria-current', 'page');
       else button.removeAttribute('aria-current');
     });
-    const labels = { inicio: 'Inicio', preparacion: 'Preparación de datos', calidad: 'Calidad de datos', ...pendingTitles };
+    const labels = { inicio: 'Inicio', preparacion: 'Preparación de datos', calidad: 'Calidad de datos', mercado: 'Inteligencia de mercado', ...pendingTitles };
     elements['breadcrumb-current'].textContent = labels[view] || 'Preparación de datos';
+    elements['stage-tag'].textContent = view === 'mercado' ? 'ETAPA 02' : 'ETAPA 01';
+    elements['footer-stage'].textContent = view === 'mercado' ? 'ETAPA 02 · ANÁLISIS SOBRE DATOS CARGADOS' : 'ETAPA 01 · SIN DATOS COMERCIALES PRECARGADOS';
     if (pendingTitles[view]) elements['pending-title'].textContent = pendingTitles[view];
     if (view === 'calidad') renderQualitySummary();
+    if (view === 'mercado') window.MarketDashboard.refresh();
   }
 
   function renderStats(result) {
@@ -278,6 +280,14 @@
 
   function init() {
     cacheElements();
+    window.MarketDashboard.initialize(() => state.result ? {
+      headers: state.headers,
+      rows: state.rows,
+      result: state.result,
+      firstDataRowNumber: state.sourceRowStart,
+      fileName: state.fileName,
+      sheetName: state.sheetName
+    } : null);
     bindEvents();
   }
 

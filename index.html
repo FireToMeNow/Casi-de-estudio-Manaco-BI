@@ -11,7 +11,10 @@
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/styles.css">
     <script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
     <script defer src="assets/js/data-analysis.js"></script>
+    <script defer src="assets/js/market-analysis.js"></script>
+    <script defer src="assets/js/market-dashboard.js"></script>
     <script defer src="assets/js/app.js"></script>
   </head>
   <body>
@@ -26,10 +29,10 @@
           <button class="nav-item" type="button" data-view="inicio"><span class="nav-icon" aria-hidden="true">⌂</span>Inicio</button>
           <button class="nav-item is-active" type="button" data-view="preparacion" aria-current="page"><span class="nav-icon" aria-hidden="true">▤</span>Preparación de datos</button>
           <button class="nav-item" type="button" data-view="calidad"><span class="nav-icon" aria-hidden="true">◫</span>Calidad de datos</button>
+          <button class="nav-item" type="button" data-view="mercado"><span class="nav-icon" aria-hidden="true">◎</span>Inteligencia de mercado</button>
         </nav>
         <div class="nav-label nav-label-spaced">SIGUIENTES ETAPAS</div>
         <nav class="nav-list" aria-label="Módulos pendientes">
-          <button class="nav-item is-pending" type="button" data-view="mercado"><span class="nav-icon" aria-hidden="true">◎</span>Inteligencia de mercado<span class="pending-tag">Próximamente</span></button>
           <button class="nav-item is-pending" type="button" data-view="inventarios"><span class="nav-icon" aria-hidden="true">▦</span>Inventarios<span class="pending-tag">Próximamente</span></button>
           <button class="nav-item is-pending" type="button" data-view="pronosticos"><span class="nav-icon" aria-hidden="true">⌁</span>Pronósticos<span class="pending-tag">Próximamente</span></button>
           <button class="nav-item is-pending" type="button" data-view="rentabilidad"><span class="nav-icon" aria-hidden="true">◷</span>Rentabilidad<span class="pending-tag">Próximamente</span></button>
@@ -40,7 +43,7 @@
       <main class="main-content">
         <header class="topbar">
           <div class="breadcrumbs"><span>MANACO BI</span><span class="crumb-divider">/</span><span id="breadcrumb-current">Preparación de datos</span></div>
-          <div class="topbar-meta"><span class="stage-tag">ETAPA 01</span><span class="topbar-date">ANÁLISIS COMERCIAL</span></div>
+          <div class="topbar-meta"><span id="stage-tag" class="stage-tag">ETAPA 01</span><span class="topbar-date">ANÁLISIS COMERCIAL</span></div>
         </header>
 
         <section class="page-view is-visible" data-page="preparacion">
@@ -106,8 +109,40 @@
 
         <section class="page-view simple-view" data-page="inicio" hidden><p class="eyebrow">MANACO BI</p><h1>Inteligencia de negocios</h1><p class="heading-subtitle">Carga un archivo comercial para iniciar su preparación y validación.</p><button class="button button-primary" type="button" data-go="preparacion">Ir a preparación de datos →</button></section>
         <section class="page-view simple-view" data-page="calidad" hidden><p class="eyebrow">DATOS · CALIDAD</p><h1>Calidad de datos</h1><p class="heading-subtitle">Este módulo muestra únicamente el diagnóstico calculado de la hoja cargada.</p><button class="button button-secondary" type="button" data-go="preparacion">Volver a preparación →</button><div id="quality-summary" class="quality-summary"></div></section>
+        <section class="page-view market-view" data-page="mercado" hidden>
+          <div class="page-heading market-page-heading">
+            <div><p class="eyebrow">ANÁLISIS COMERCIAL · MERCADO</p><h1>Inteligencia de mercado</h1><p id="market-source" class="heading-subtitle">El análisis usará la hoja activa de Preparación de datos.</p></div>
+            <div class="market-source-tag"><span class="local-dot"></span>Datos locales · sin carga duplicada</div>
+          </div>
+          <div id="market-empty" class="market-empty" hidden><div class="empty-mark" aria-hidden="true">◎</div><h2>Primero carga datos comerciales</h2><p>Este módulo analiza la hoja seleccionada en Preparación de datos. Aún no hay archivo cargado y no se muestran datos de ejemplo.</p><button class="button button-primary" type="button" data-go="preparacion">Ir a preparación de datos</button></div>
+          <div id="market-workspace" hidden>
+            <section class="market-filterbar" aria-label="Filtros del análisis de mercado">
+              <label id="market-period-filter-wrap" class="market-filter" hidden><span>Periodo</span><select id="market-period-filter"></select></label>
+              <label id="market-country-filter-wrap" class="market-filter" hidden><span>País socio</span><select id="market-country-filter"></select></label>
+              <label id="market-flow-filter-wrap" class="market-filter" hidden><span>Flujo</span><select id="market-flow-filter"></select></label>
+              <label id="market-product-filter-wrap" class="market-filter" hidden><span>Producto</span><select id="market-product-filter"></select></label>
+              <label id="market-world-filter-wrap" class="market-filter market-world-filter" hidden><span>Alcance de «Mundo»</span><select id="market-world-filter"><option value="detailed">Desglose por país</option><option value="world">Solo fila «Mundo»</option></select></label>
+              <button id="market-reset-filters" class="button button-secondary" type="button">Limpiar filtros</button>
+              <button id="market-export" class="button button-primary market-export-button" type="button">↓ Exportar resultados</button>
+            </section>
+            <div id="market-alerts" class="market-alerts" role="status" aria-live="polite"></div>
+            <div id="market-counts" class="market-counts" aria-live="polite"></div>
+            <div id="market-kpis" class="market-kpis" aria-live="polite"></div>
+            <section class="market-chart-grid" aria-label="Gráficos del análisis comercial">
+              <article id="market-flow-card" class="market-section market-chart-card" hidden><div class="market-section-heading"><div><p class="eyebrow">COMERCIO</p><h2>Importaciones y exportaciones</h2></div></div><div class="market-chart"><canvas id="market-flow-chart" aria-label="Comparación de importaciones y exportaciones"></canvas></div><p id="market-flow-chart-note" class="market-chart-note"></p></article>
+              <article id="market-partner-card" class="market-section market-chart-card" hidden><div class="market-section-heading"><div><p class="eyebrow">PAÍSES SOCIOS</p><h2>Valor por socio</h2></div></div><div class="market-chart market-chart-tall"><canvas id="market-partner-chart" aria-label="Valores de importación y exportación por socio"></canvas></div><p id="market-partner-chart-note" class="market-chart-note"></p></article>
+              <article id="market-period-card" class="market-section market-chart-card market-period-card" hidden><div class="market-section-heading"><div><p class="eyebrow">EVOLUCIÓN</p><h2>Valor por periodo</h2></div></div><div class="market-chart market-chart-tall"><canvas id="market-period-chart" aria-label="Evolución de importaciones y exportaciones por periodo"></canvas></div><p id="market-period-chart-note" class="market-chart-note"></p></article>
+            </section>
+            <section id="market-partners-section" class="market-section" hidden><div class="market-section-heading"><div><p class="eyebrow">PAÍSES SOCIOS</p><h2 id="market-partners-title">Socios por valor total</h2></div><span id="market-partners-count" class="muted-label"></span></div><div class="market-table-wrap"><table id="market-partners-table"><thead><tr><th>País socio</th><th>Importaciones</th><th>Exportaciones</th><th>Unidad</th><th>Registros importación</th><th>Registros exportación</th></tr></thead><tbody></tbody></table></div><p id="market-partners-note" class="market-table-note"></p></section>
+            <section id="market-periods-section" class="market-section" hidden><div class="market-section-heading"><div><p class="eyebrow">PERIODOS</p><h2>Tabla de evolución</h2></div></div><div class="market-table-wrap"><table id="market-periods-table"><thead><tr><th>Periodo</th><th>Importaciones</th><th>Exportaciones</th><th>Registros</th></tr></thead><tbody></tbody></table></div><p id="market-periods-note" class="market-table-note"></p></section>
+            <section class="market-section market-schema-section"><div class="market-section-heading"><div><p class="eyebrow">COLUMNAS DETECTADAS</p><h2>Campos usados y disponibilidad</h2></div></div><div class="market-table-wrap"><table id="market-schema-table"><thead><tr><th>Rol analítico</th><th>Columna de origen</th><th>Uso y condición</th></tr></thead><tbody></tbody></table></div></section>
+            <section id="market-results-section" class="market-section"><div class="market-section-heading"><div><p class="eyebrow">TABLA DEL INDICADOR</p><h2 id="market-table-title">Registros incluidos en el análisis</h2></div><span id="market-table-count" class="muted-label"></span></div><div class="market-table-wrap market-records-wrap"><table id="market-records-table"><thead></thead><tbody></tbody></table></div></section>
+            <section id="market-world-section" class="market-section" hidden><div class="market-section-heading"><div><p class="eyebrow">AGREGADOS</p><h2>Filas «Mundo» identificadas</h2></div><span id="market-world-count" class="muted-label"></span></div><div class="market-table-wrap"><table id="market-world-table"><thead></thead><tbody></tbody></table></div></section>
+            <details class="market-assumptions"><summary>Supuestos, cobertura y limitaciones</summary><ul id="market-assumptions-list"></ul></details>
+          </div>
+        </section>
         <section class="page-view simple-view" data-page="pendiente" hidden><p class="eyebrow">MANACO BI · ETAPA FUTURA</p><h1 id="pending-title">Módulo pendiente</h1><p class="heading-subtitle">Esta funcionalidad no forma parte de la primera etapa y no presenta resultados.</p><button class="button button-secondary" type="button" data-go="preparacion">Volver a preparación →</button></section>
-        <footer class="page-footer"><span>MANACO BI <i></i> PREPARACIÓN Y VALIDACIÓN</span><span>ETAPA 01 · SIN DATOS COMERCIALES PRECARGADOS</span></footer>
+        <footer class="page-footer"><span>MANACO BI <i></i> PREPARACIÓN Y VALIDACIÓN</span><span id="footer-stage">ETAPA 01 · SIN DATOS COMERCIALES PRECARGADOS</span></footer>
       </main>
     </div>
   </body>
