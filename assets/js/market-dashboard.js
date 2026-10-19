@@ -3,11 +3,12 @@
 
   const analysis = window.MarketAnalysis;
   const state = { getDataset: null, charts: {}, result: null, initialized: false };
-  const filterRoles = ['period', 'country', 'flow', 'product'];
+  const filterRoles = ['period', 'reportingCountry', 'country', 'flow', 'product'];
   const roleLabels = {
+    reportingCountry: 'País reportante',
     country: 'País socio',
     flow: 'Flujo comercial',
-    product: 'Producto',
+    product: 'Categoría de calzado / producto',
     quantity: 'Cantidad de pares',
     value: 'Valor comercial',
     period: 'Periodo',
@@ -49,6 +50,7 @@
   function getFilters() {
     return {
       period: $('market-period-filter').value,
+      reportingCountry: $('market-reportingCountry-filter').value,
       country: $('market-country-filter').value,
       flow: $('market-flow-filter').value,
       product: $('market-product-filter').value,
@@ -95,6 +97,7 @@
     if (!result.schema.period && result.totals.importRecords && result.totals.exportRecords) messages.push('Sin un periodo reconocido no se puede validar que importaciones y exportaciones cubran el mismo intervalo; se bloquean comparaciones y saldo.');
     if (result.counts.worldCandidates) messages.push(`Se detectaron ${result.counts.worldCandidates} fila(s) «Mundo» en el filtro actual. No se mezclan con el desglose por país; puedes inspeccionarlas en el selector de alcance.`);
     if (result.counts.duplicates) messages.push(`${result.counts.duplicates} registro(s) repetido(s) exactos están incluidos tal como aparecen. Revisa si pueden producir dobles conteos; no se eliminaron automáticamente.`);
+    if (!result.schema.reportingCountry) messages.push('No se detectó una columna explícita de país reportante; no se atribuyen los flujos a un país inferido.');
     if (!result.schema.country) messages.push('Sin una columna de país socio no se calculan principales socios.');
     if (!result.schema.product) messages.push('No se detectó una columna de producto; el filtro de producto no está disponible.');
     if (!result.schema.period) messages.push('No se detectó una columna de periodo; no se calcula evolución temporal.');
@@ -121,6 +124,18 @@
     $('market-counts').innerHTML = items.map(([label, value]) => `<div><span>${label}</span><strong>${value}</strong></div>`).join('');
   }
 
+  function renderAnalysisPeriod(result) {
+    const periods = result.periods.analyzed;
+    const label = result.filters.period
+      ? result.filters.period
+      : periods.length === 1
+        ? periods[0]
+        : periods.length > 1
+          ? `${periods[0]} – ${periods[periods.length - 1]}`
+          : 'Sin periodo reconocible';
+    $('market-analysis-period').textContent = `Periodo analizado: ${label} · ${result.counts.included} registros incluidos de ${result.counts.source} registros no vacíos de origen.`;
+  }
+
   function renderKpis(result) {
     const unit = result.units.label;
     const selectedFlow = analysis.classifyFlow(result.filters.flow);
@@ -132,7 +147,19 @@
       { label: 'Saldo comercial', value: result.totals.balance === null ? 'No calculado' : formatValue(result.totals.balance, unit), note: result.totals.balance === null ? 'Requiere unidad común y cobertura temporal coincidente' : 'Exportaciones − importaciones' },
       { label: 'Valor por par', value: result.valuePerPair === null ? 'No calculado' : formatValue(result.valuePerPair, `${unit}/par`), note: `${result.counts.pairIncluded} incluidos · ${result.counts.pairExcluded} excluidos; un periodo y pares positivos` }
     ];
+    if (result.diagnostics.hasCountry) {
+      const highest = result.diagnostics.partnersComparable ? result.partners.find((partner) => Number.isFinite(partner.total)) : null;
+      cards.push({
+        label: 'Principal socio comercial',
+        value: highest ? highest.country : 'No calculado',
+        note: highest ? `${formatValue(highest.total, unit)} · ranking comparable en el periodo filtrado` : 'Requiere socio, unidad y periodo comparables'
+      });
+    }
     $('market-kpis').innerHTML = cards.map((card) => `<article class="market-kpi"><span>${card.label}</span><strong>${escapeHtml(card.value)}</strong><small>${escapeHtml(card.note)}</small></article>`).join('');
+  }
+
+  function renderFindings(result) {
+    $('market-findings-list').innerHTML = analysis.generateFindings(result).map((finding) => `<article class="market-finding"><h3>${escapeHtml(finding.title)}</h3><p>${escapeHtml(finding.observation)}</p><small>Dato que lo sustenta: ${escapeHtml(finding.evidence)}</small></article>`).join('');
   }
 
   function destroyChart(key) {
@@ -294,7 +321,9 @@
     renderSchema(result);
     renderAlerts(result);
     renderCounts(result);
+    renderAnalysisPeriod(result);
     renderKpis(result);
+    renderFindings(result);
     renderCharts(result);
     renderPartnerTable(result);
     renderPeriodTable(result);

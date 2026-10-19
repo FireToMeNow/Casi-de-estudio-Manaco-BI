@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { analyzeMarket, getFilterOptions, resolveSchema } = require('../assets/js/market-analysis.js');
+const { analyzeMarket, generateFindings, getFilterOptions, resolveSchema } = require('../assets/js/market-analysis.js');
 
 const syntheticHeaders = ['País socio', 'Flujo comercial', 'Producto', 'Cantidad de pares', 'Valor USD', 'Periodo'];
 
@@ -25,6 +25,53 @@ test('datos sintéticos: detecta roles solo en encabezados presentes y lista col
   assert.equal(schema.value.header, 'Valor USD');
   assert.equal(schema.period.header, 'Periodo');
   assert.equal(resolveSchema(['Columna sin clasificar']).country, undefined);
+});
+
+test('datos sintéticos: separa país reportante y socio comercial en filtros y resultados', () => {
+  const headers = ['País reportante', 'País socio', 'Flujo', 'Valor USD', 'Periodo'];
+  const rows = [
+    ['Bolivia', 'Argentina', 'Importaciones', 100, '2024'],
+    ['Bolivia', 'Chile', 'Exportaciones', 150, '2024'],
+    ['España', 'Bolivia', 'Importaciones', 900, '2024']
+  ];
+  const schema = resolveSchema(headers);
+  assert.equal(schema.reportingCountry.header, 'País reportante');
+  assert.equal(schema.country.header, 'País socio');
+  const options = getFilterOptions(headers, rows);
+  assert.deepEqual(options.reportingCountry, ['Bolivia', 'España']);
+  assert.deepEqual(options.country, ['Argentina', 'Bolivia', 'Chile']);
+
+  const result = analyzeMarket(headers, rows, { reportingCountry: 'Bolivia', country: 'Chile' });
+  assert.equal(result.counts.afterFilters, 1);
+  assert.equal(result.totals.import, null);
+  assert.equal(result.totals.export, 150);
+  assert.equal(result.totals.balance, null);
+  assert.deepEqual(result.periods.analyzed, ['2024']);
+});
+
+test('datos sintéticos: hallazgos informan valores calculados y respetan filtros', () => {
+  const headers = ['País reportante', 'País socio', 'Flujo', 'Valor USD', 'Periodo'];
+  const rows = [
+    ['Bolivia', 'Argentina', 'Importaciones', 100, '2024'],
+    ['Bolivia', 'Chile', 'Exportaciones', 150, '2024'],
+    ['España', 'Bolivia', 'Importaciones', 900, '2024']
+  ];
+  const result = analyzeMarket(headers, rows, { reportingCountry: 'Bolivia' });
+  const findings = generateFindings(result);
+  assert.equal(result.totals.balance, 50);
+  assert.match(findings[0].observation, /exportaciones.*superan las importaciones/i);
+  assert.match(findings[0].evidence, /150 − importaciones 100 = saldo 50 USD/);
+  assert.ok(findings.some((finding) => finding.observation.includes('Chile')));
+  assert.ok(findings.every((finding) => !finding.evidence.includes('900')));
+});
+
+test('datos sintéticos: sin registros no genera cifras ni hallazgos ficticios', () => {
+  const result = analyzeMarket(syntheticHeaders, []);
+  const findings = generateFindings(result);
+  assert.equal(result.counts.source, 0);
+  assert.deepEqual(result.periods.analyzed, []);
+  assert.equal(findings.length, 1);
+  assert.match(findings[0].observation, /No hay resultados comparables/);
 });
 
 test('datos sintéticos: conserva el cero y separa valores ausentes de valores válidos', () => {

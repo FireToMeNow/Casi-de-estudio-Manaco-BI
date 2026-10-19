@@ -2,9 +2,10 @@
   'use strict';
 
   const aliases = {
+    reportingCountry: ['pais reportante', 'pais de reporte', 'pais que reporta', 'pais informante', 'reporting country', 'reporter country', 'reporting economy', 'economia reportante', 'pais declarante', 'declaring country', 'reporting area'],
     country: ['pais socio', 'socio comercial', 'partner country', 'country partner', 'pais de origen', 'pais de destino', 'pais', 'country', 'partner', 'socio'],
     flow: ['flujo comercial', 'tipo de flujo', 'trade flow', 'flow', 'flujo', 'tipo de comercio', 'operacion'],
-    product: ['producto', 'product', 'commodity', 'mercancia', 'partida arancelaria', 'codigo arancelario', 'hs code', 'descripcion del producto'],
+    product: ['categoria de calzado', 'shoe category', 'footwear category', 'calzado', 'footwear', 'producto', 'product', 'commodity', 'mercancia', 'partida arancelaria', 'codigo arancelario', 'hs code', 'descripcion del producto'],
     quantity: ['cantidad de pares', 'pares', 'pair quantity', 'quantity of pairs', 'number of pairs', 'pairs', 'cantidad', 'quantity', 'qty'],
     value: ['valor comercial', 'trade value', 'valor de comercio', 'valor usd', 'trade value usd', 'fob value', 'cif value', 'valor', 'value', 'monto'],
     period: ['periodo', 'period', 'fecha', 'date', 'ano', 'year', 'mes', 'month'],
@@ -29,6 +30,7 @@
     for (const [role, roleAliases] of Object.entries(aliases)) {
       const candidates = [];
       normalizedHeaders.forEach((header, index) => {
+        if (role === 'country' && aliases.reportingCountry.some((alias) => header === alias || header.includes(alias))) return;
         for (const alias of roleAliases) {
           const match = header === alias || header.includes(alias);
           if (match) candidates.push({ index, header: String(headers[index] ?? ''), score: header === alias ? 1000 : alias.length });
@@ -119,6 +121,7 @@
   function getFilterOptions(headers, rows) {
     const schema = resolveSchema(headers);
     return {
+      reportingCountry: schema.reportingCountry ? uniqueValues(rows, schema.reportingCountry.index) : [],
       country: schema.country ? uniqueValues(rows, schema.country.index) : [],
       flow: schema.flow ? uniqueValues(rows, schema.flow.index) : [],
       product: schema.product ? uniqueValues(rows, schema.product.index) : [],
@@ -138,6 +141,7 @@
       sourceRow: firstDataRowNumber + index
     })).filter(({ row }) => row.some((value) => value !== null && value !== undefined && String(value).trim() !== ''));
     const filterMatches = sourceRows.filter(({ row }) => {
+      if (schema.reportingCountry && !sameFilter(row[schema.reportingCountry.index], filters.reportingCountry)) return false;
       if (schema.country && !sameFilter(row[schema.country.index], filters.country)) return false;
       if (schema.flow && !sameFilter(row[schema.flow.index], filters.flow)) return false;
       if (schema.product && !sameFilter(row[schema.product.index], filters.product)) return false;
@@ -263,6 +267,7 @@
       }))
       .sort((a, b) => a.period.localeCompare(b.period));
     const timeRecordsIncluded = timeSeries.reduce((sum, period) => sum + period.records, 0);
+    const analyzedPeriods = [...new Set(flowRecords.map((record) => record.period).filter(Boolean))].sort();
 
     const pairScopeRecords = filters.flow
       ? flowRecords.filter((record) => record.flow === classifyFlow(filters.flow))
@@ -316,7 +321,7 @@
         pairIncluded: pairCalculationAvailable ? pairCandidateRecords.length : 0,
         pairExcluded: pairScopeRecords.length - (pairCalculationAvailable ? pairCandidateRecords.length : 0)
       },
-      periods: { comparable: periodsComparable },
+      periods: { comparable: periodsComparable, analyzed: analyzedPeriods },
       totals: {
         import: importTotal,
         export: exportTotal,
@@ -361,7 +366,70 @@
     };
   }
 
-  const api = { analyzeMarket, classifyFlow, getFilterOptions, isWorld, normalizePeriod, parseNumber, resolveSchema };
+  function generateFindings(result) {
+    const findings = [];
+    const unit = result.units.label;
+    const selectedFlow = classifyFlow(result.filters.flow);
+
+    if (result.totals.balance !== null) {
+      const difference = Math.abs(result.totals.balance);
+      const direction = result.totals.balance > 0
+        ? 'En el alcance filtrado, las exportaciones superan las importaciones.'
+        : result.totals.balance < 0
+          ? 'En el alcance filtrado, las importaciones superan las exportaciones.'
+          : 'En el alcance filtrado, importaciones y exportaciones tienen el mismo total.';
+      findings.push({
+        title: 'Comparación de flujos',
+        observation: direction,
+        evidence: `Exportaciones ${result.totals.export} − importaciones ${result.totals.import} = saldo ${result.totals.balance} ${unit}; cobertura temporal coincidente.`
+      });
+      if (difference === 0) findings[findings.length - 1].evidence = `Importaciones ${result.totals.import} y exportaciones ${result.totals.export} ${unit}; diferencia calculada: 0.`;
+    }
+
+    if (result.diagnostics.partnersComparable && result.partners.length) {
+      const ranking = result.partners.filter((partner) => Number.isFinite(partner.total));
+      const highest = ranking[0];
+      if (highest) {
+        const flowLabel = selectedFlow === 'import' ? 'importaciones' : selectedFlow === 'export' ? 'exportaciones' : 'ambos flujos';
+        findings.push({
+          title: 'Principal socio comercial',
+          observation: `${highest.country} registra el mayor valor agregado de ${flowLabel} dentro del alcance filtrado.`,
+          evidence: `${highest.total} ${unit} en ${highest.records} registros; ranking solo con unidad comparable y el periodo analizado.`
+        });
+      }
+    }
+
+    if (result.units.comparable && result.timeSeries.length) {
+      const seriesKey = selectedFlow === 'import' ? 'imports' : selectedFlow === 'export' ? 'exports' : null;
+      const canSumFlows = !selectedFlow && result.periods.comparable;
+      const comparableSeries = result.timeSeries.map((period) => ({
+        period: period.period,
+        value: seriesKey ? period[seriesKey] : canSumFlows ? period.imports + period.exports : null,
+        records: period.records
+      })).filter((period) => Number.isFinite(period.value));
+      if (comparableSeries.length) {
+        const maximum = Math.max(...comparableSeries.map((period) => period.value));
+        const peakPeriods = comparableSeries.filter((period) => period.value === maximum).map((period) => period.period);
+        const basis = seriesKey === 'imports' ? 'importaciones' : seriesKey === 'exports' ? 'exportaciones' : 'importaciones y exportaciones';
+        findings.push({
+          title: 'Periodo con mayor valor registrado',
+          observation: `${peakPeriods.join(', ')} presenta el mayor valor de ${basis} en los periodos comparables.`,
+          evidence: `${maximum} ${unit} en ${peakPeriods.length === 1 ? 'el periodo' : 'cada periodo indicado'}; basado en ${comparableSeries.filter((period) => peakPeriods.includes(period.period)).reduce((sum, period) => sum + period.records, 0)} registros con periodo válido.`
+        });
+      }
+    }
+
+    if (findings.length === 0) {
+      findings.push({
+        title: 'Alcance del análisis',
+        observation: 'No hay resultados comparables suficientes para generar hallazgos comerciales.',
+        evidence: `${result.counts.included} registros incluidos de ${result.counts.inScope} en alcance; revisa filtros, columnas y advertencias.`
+      });
+    }
+    return findings;
+  }
+
+  const api = { analyzeMarket, classifyFlow, generateFindings, getFilterOptions, isWorld, normalizePeriod, parseNumber, resolveSchema };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.MarketAnalysis = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

@@ -51,10 +51,10 @@
       if (active) button.setAttribute('aria-current', 'page');
       else button.removeAttribute('aria-current');
     });
-    const labels = { inicio: 'Inicio', preparacion: 'Preparación de datos', calidad: 'Calidad de datos', mercado: 'Inteligencia de mercado', ...pendingTitles };
+    const labels = { inicio: 'Inicio', preparacion: 'Preparación de datos', calidad: 'Calidad de datos', mercado: 'Dashboard ejecutivo', ...pendingTitles };
     elements['breadcrumb-current'].textContent = labels[view] || 'Preparación de datos';
-    elements['stage-tag'].textContent = view === 'mercado' ? 'ETAPA 02' : 'ETAPA 01';
-    elements['footer-stage'].textContent = view === 'mercado' ? 'ETAPA 02 · ANÁLISIS SOBRE DATOS CARGADOS' : 'ETAPA 01 · SIN DATOS COMERCIALES PRECARGADOS';
+    elements['stage-tag'].textContent = view === 'mercado' ? 'ETAPA 03' : 'ETAPA 01';
+    elements['footer-stage'].textContent = view === 'mercado' ? 'ETAPA 03 · DASHBOARD SOBRE DATOS CARGADOS' : 'ETAPA 01 · SIN DATOS COMERCIALES PRECARGADOS';
     if (pendingTitles[view]) elements['pending-title'].textContent = pendingTitles[view];
     if (view === 'calidad') renderQualitySummary();
     if (view === 'mercado') window.MarketDashboard.refresh();

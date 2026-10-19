@@ -29,7 +29,7 @@
           <button class="nav-item" type="button" data-view="inicio"><span class="nav-icon" aria-hidden="true">⌂</span>Inicio</button>
           <button class="nav-item is-active" type="button" data-view="preparacion" aria-current="page"><span class="nav-icon" aria-hidden="true">▤</span>Preparación de datos</button>
           <button class="nav-item" type="button" data-view="calidad"><span class="nav-icon" aria-hidden="true">◫</span>Calidad de datos</button>
-          <button class="nav-item" type="button" data-view="mercado"><span class="nav-icon" aria-hidden="true">◎</span>Inteligencia de mercado</button>
+          <button class="nav-item" type="button" data-view="mercado"><span class="nav-icon" aria-hidden="true">▥</span>Dashboard ejecutivo</button>
         </nav>
         <div class="nav-label nav-label-spaced">SIGUIENTES ETAPAS</div>
         <nav class="nav-list" aria-label="Módulos pendientes">
@@ -111,23 +111,27 @@
         <section class="page-view simple-view" data-page="calidad" hidden><p class="eyebrow">DATOS · CALIDAD</p><h1>Calidad de datos</h1><p class="heading-subtitle">Este módulo muestra únicamente el diagnóstico calculado de la hoja cargada.</p><button class="button button-secondary" type="button" data-go="preparacion">Volver a preparación →</button><div id="quality-summary" class="quality-summary"></div></section>
         <section class="page-view market-view" data-page="mercado" hidden>
           <div class="page-heading market-page-heading">
-            <div><p class="eyebrow">ANÁLISIS COMERCIAL · MERCADO</p><h1>Inteligencia de mercado</h1><p id="market-source" class="heading-subtitle">El análisis usará la hoja activa de Preparación de datos.</p></div>
+            <div><p class="eyebrow">ANÁLISIS COMERCIAL · ETAPA 03</p><h1>Dashboard ejecutivo</h1><p id="market-source" class="heading-subtitle">El análisis usará la hoja activa de Preparación de datos.</p></div>
             <div class="market-source-tag"><span class="local-dot"></span>Datos locales · sin carga duplicada</div>
           </div>
+          <p class="market-scope-note">Los indicadores describen los flujos de importación y exportación de la fuente cargada; solo se atribuye un país reportante cuando esa columna está identificada. No representan ventas de MANACO: un país como España no se interpreta como Bolivia ni como datos de la empresa.</p>
           <div id="market-empty" class="market-empty" hidden><div class="empty-mark" aria-hidden="true">◎</div><h2>Primero carga datos comerciales</h2><p>Este módulo analiza la hoja seleccionada en Preparación de datos. Aún no hay archivo cargado y no se muestran datos de ejemplo.</p><button class="button button-primary" type="button" data-go="preparacion">Ir a preparación de datos</button></div>
           <div id="market-workspace" hidden>
             <section class="market-filterbar" aria-label="Filtros del análisis de mercado">
               <label id="market-period-filter-wrap" class="market-filter" hidden><span>Periodo</span><select id="market-period-filter"></select></label>
-              <label id="market-country-filter-wrap" class="market-filter" hidden><span>País socio</span><select id="market-country-filter"></select></label>
+              <label id="market-reportingCountry-filter-wrap" class="market-filter" hidden><span>País reportante</span><select id="market-reportingCountry-filter"></select></label>
+              <label id="market-country-filter-wrap" class="market-filter" hidden><span>Socio comercial</span><select id="market-country-filter"></select></label>
               <label id="market-flow-filter-wrap" class="market-filter" hidden><span>Flujo</span><select id="market-flow-filter"></select></label>
-              <label id="market-product-filter-wrap" class="market-filter" hidden><span>Producto</span><select id="market-product-filter"></select></label>
+              <label id="market-product-filter-wrap" class="market-filter" hidden><span>Categoría de calzado / producto</span><select id="market-product-filter"></select></label>
               <label id="market-world-filter-wrap" class="market-filter market-world-filter" hidden><span>Alcance de «Mundo»</span><select id="market-world-filter"><option value="detailed">Desglose por país</option><option value="world">Solo fila «Mundo»</option></select></label>
               <button id="market-reset-filters" class="button button-secondary" type="button">Limpiar filtros</button>
               <button id="market-export" class="button button-primary market-export-button" type="button">↓ Exportar resultados</button>
             </section>
             <div id="market-alerts" class="market-alerts" role="status" aria-live="polite"></div>
+            <p id="market-analysis-period" class="market-analysis-period" aria-live="polite"></p>
             <div id="market-counts" class="market-counts" aria-live="polite"></div>
             <div id="market-kpis" class="market-kpis" aria-live="polite"></div>
+            <section class="market-section market-findings"><div class="market-section-heading"><div><p class="eyebrow">LECTURA DESCRIPTIVA</p><h2>Hallazgos del análisis</h2></div></div><div id="market-findings-list" class="market-findings-list" aria-live="polite"></div></section>
             <section class="market-chart-grid" aria-label="Gráficos del análisis comercial">
               <article id="market-flow-card" class="market-section market-chart-card" hidden><div class="market-section-heading"><div><p class="eyebrow">COMERCIO</p><h2>Importaciones y exportaciones</h2></div></div><div class="market-chart"><canvas id="market-flow-chart" aria-label="Comparación de importaciones y exportaciones"></canvas></div><p id="market-flow-chart-note" class="market-chart-note"></p></article>
               <article id="market-partner-card" class="market-section market-chart-card" hidden><div class="market-section-heading"><div><p class="eyebrow">PAÍSES SOCIOS</p><h2>Valor por socio</h2></div></div><div class="market-chart market-chart-tall"><canvas id="market-partner-chart" aria-label="Valores de importación y exportación por socio"></canvas></div><p id="market-partner-chart-note" class="market-chart-note"></p></article>
