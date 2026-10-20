@@ -3,6 +3,7 @@ node_modules/
 *.xls
 *.xlsx
 !plantillas/Plantilla_datos_para_MANACO_BI.xlsx
+!Ejemplo_datos_simulados_MANACO_BI.xlsx
 *.xlsm
 data/
 !assets/data/
