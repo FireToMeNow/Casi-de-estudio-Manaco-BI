@@ -119,7 +119,7 @@
           <div id="market-empty" class="market-empty" hidden><div class="empty-mark" aria-hidden="true">◎</div><h2>Primero carga datos comerciales</h2><p>Este módulo analiza la hoja seleccionada en Preparación de datos. Aún no hay archivo cargado y no se muestran datos de ejemplo.</p><button class="button button-primary" type="button" data-go="preparacion">Ir a preparación de datos</button></div>
           <div id="market-workspace" hidden>
             <section class="market-filterbar" aria-label="Filtros del análisis de mercado">
-              <label id="market-period-filter-wrap" class="market-filter" hidden><span>Periodo</span><select id="market-period-filter"></select></label>
+              <label id="market-period-filter-wrap" class="market-filter" hidden><span>Año o periodo</span><select id="market-period-filter"></select></label>
               <label id="market-reportingCountry-filter-wrap" class="market-filter" hidden><span>País reportante</span><select id="market-reportingCountry-filter"></select></label>
               <label id="market-country-filter-wrap" class="market-filter" hidden><span>Socio comercial</span><select id="market-country-filter"></select></label>
               <label id="market-flow-filter-wrap" class="market-filter" hidden><span>Flujo</span><select id="market-flow-filter"></select></label>
@@ -136,7 +136,8 @@
             <section class="market-chart-grid" aria-label="Gráficos del análisis comercial">
               <article id="market-flow-card" class="market-section market-chart-card" hidden><div class="market-section-heading"><div><p class="eyebrow">COMERCIO</p><h2>Importaciones y exportaciones</h2></div></div><div class="market-chart"><canvas id="market-flow-chart" aria-label="Comparación de importaciones y exportaciones"></canvas></div><p id="market-flow-chart-note" class="market-chart-note"></p></article>
               <article id="market-partner-card" class="market-section market-chart-card" hidden><div class="market-section-heading"><div><p class="eyebrow">PAÍSES SOCIOS</p><h2>Valor por socio</h2></div></div><div class="market-chart market-chart-tall"><canvas id="market-partner-chart" aria-label="Valores de importación y exportación por socio"></canvas></div><p id="market-partner-chart-note" class="market-chart-note"></p></article>
-              <article id="market-period-card" class="market-section market-chart-card market-period-card" hidden><div class="market-section-heading"><div><p class="eyebrow">EVOLUCIÓN</p><h2>Valor por periodo</h2></div></div><div class="market-chart market-chart-tall"><canvas id="market-period-chart" aria-label="Evolución de importaciones y exportaciones por periodo"></canvas></div><p id="market-period-chart-note" class="market-chart-note"></p></article>
+              <article id="market-period-card" class="market-section market-chart-card market-period-card" hidden><div class="market-section-heading"><div><p class="eyebrow">EVOLUCIÓN ANUAL</p><h2>Importaciones y exportaciones por año</h2></div></div><div class="market-chart market-chart-tall"><canvas id="market-period-chart" aria-label="Evolución anual de importaciones y exportaciones"></canvas></div><p id="market-period-chart-note" class="market-chart-note"></p></article>
+              <article id="market-category-card" class="market-section market-chart-card" hidden><div class="market-section-heading"><div><p class="eyebrow">MEZCLA DE PRODUCTOS</p><h2>Distribución por categoría</h2></div></div><div class="market-chart"><canvas id="market-category-chart" aria-label="Distribución del valor comercial por categoría de producto"></canvas></div><p id="market-category-chart-note" class="market-chart-note"></p></article>
             </section>
             <section id="market-partners-section" class="market-section" hidden><div class="market-section-heading"><div><p class="eyebrow">PAÍSES SOCIOS</p><h2 id="market-partners-title">Socios por valor total</h2></div><span id="market-partners-count" class="muted-label"></span></div><div class="market-table-wrap"><table id="market-partners-table"><thead><tr><th>País socio</th><th>Importaciones</th><th>Exportaciones</th><th>Unidad</th><th>Registros importación</th><th>Registros exportación</th></tr></thead><tbody></tbody></table></div><p id="market-partners-note" class="market-table-note"></p></section>
             <section id="market-periods-section" class="market-section" hidden><div class="market-section-heading"><div><p class="eyebrow">PERIODOS</p><h2>Tabla de evolución</h2></div></div><div class="market-table-wrap"><table id="market-periods-table"><thead><tr><th>Periodo</th><th>Importaciones</th><th>Exportaciones</th><th>Registros</th></tr></thead><tbody></tbody></table></div><p id="market-periods-note" class="market-table-note"></p></section>
@@ -147,17 +148,21 @@
           </div>
         </section>
         <section class="page-view module-view" data-page="inventarios" hidden>
-          <div class="page-heading"><div><p class="eyebrow">ANÁLISIS OPERATIVO · ETAPA 04</p><h1>Inventarios</h1><p class="heading-subtitle">Entradas, salidas y alertas calculadas solo si el archivo tiene columnas compatibles.</p></div><div class="market-source-tag"><span class="local-dot"></span>Datos locales</div></div>
+          <div class="page-heading"><div><p class="eyebrow">ANÁLISIS OPERATIVO · ETAPA 04</p><h1>Inventarios</h1><p class="heading-subtitle">Movimientos, existencias y reposición basados en columnas compatibles de la hoja cargada.</p></div><div class="market-source-tag"><span class="local-dot"></span>Datos locales</div></div>
+          <section id="inventarios-filters" class="module-filterbar" aria-label="Filtros del análisis de inventario"></section>
           <div id="inventarios-results" class="module-results" aria-live="polite"></div>
           <button class="button button-secondary" type="button" data-go="preparacion">Volver a preparación de datos</button>
         </section>
         <section class="page-view module-view" data-page="pronosticos" hidden>
-          <div class="page-heading"><div><p class="eyebrow">ANÁLISIS TEMPORAL · ETAPA 05</p><h1>Pronósticos</h1><p class="heading-subtitle">Estimación de referencia disponible solo con historia anual suficiente y comparable.</p></div><div class="market-source-tag"><span class="local-dot"></span>Datos locales</div></div>
+          <div class="page-heading"><div><p class="eyebrow">ANÁLISIS TEMPORAL · ETAPA 05</p><h1>Pronósticos</h1><p class="heading-subtitle">Línea base de flujos comerciales; requiere series anuales continuas y una unidad comparable.</p></div><div class="market-source-tag"><span class="local-dot"></span>Datos locales</div></div>
+          <p class="module-context-note">El pronóstico describe únicamente importaciones y exportaciones del archivo seleccionado. No equivale a demanda de calzado ni a ventas futuras de MANACO.</p>
+          <section id="pronosticos-filters" class="module-filterbar" aria-label="Filtros del pronóstico comercial"></section>
           <div id="pronosticos-results" class="module-results" aria-live="polite"></div>
           <button class="button button-secondary" type="button" data-go="preparacion">Volver a preparación de datos</button>
         </section>
         <section class="page-view module-view" data-page="rentabilidad" hidden>
           <div class="page-heading"><div><p class="eyebrow">ANÁLISIS FINANCIERO · ETAPA 06</p><h1>Rentabilidad</h1><p class="heading-subtitle">Margen calculado únicamente con ingresos por ventas y costo de ventas compatibles.</p></div><div class="market-source-tag"><span class="local-dot"></span>Datos locales</div></div>
+          <section id="rentabilidad-filters" class="module-filterbar" aria-label="Filtros del análisis de rentabilidad"></section>
           <div id="rentabilidad-results" class="module-results" aria-live="polite"></div>
           <button class="button button-secondary" type="button" data-go="preparacion">Volver a preparación de datos</button>
         </section>

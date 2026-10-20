@@ -104,6 +104,7 @@
     if (!result.schema.reportingCountry) messages.push('No se detectó una columna explícita de país reportante; no se atribuyen los flujos a un país inferido.');
     if (!result.schema.country) messages.push('Sin una columna de país socio no se calculan principales socios.');
     if (!result.schema.product) messages.push('No se detectó una columna de producto; el filtro de producto no está disponible.');
+    if (!result.schema.product) messages.push('No se puede mostrar la distribución del valor comercial por categoría sin una columna de producto reconocida.');
     if (!result.schema.period) messages.push('No se detectó una columna de periodo; no se calcula evolución temporal.');
     else if (result.diagnostics.invalidPeriods) messages.push(`${result.diagnostics.invalidPeriods} registro(s) válido(s) tienen un periodo no reconocido y no aparecen en la evolución temporal.`);
     if (!result.schema.quantity) messages.push('No se detectó una columna de cantidad; no se calcula valor por par.');
@@ -190,16 +191,37 @@
     };
   }
 
+  function annualSeries(timeSeries) {
+    const years = new Map();
+    for (const period of timeSeries) {
+      const year = period.period.slice(0, 4);
+      const group = years.get(year) ?? { period: year, imports: null, exports: null };
+      if (period.imports !== null) group.imports = (group.imports ?? 0) + period.imports;
+      if (period.exports !== null) group.exports = (group.exports ?? 0) + period.exports;
+      years.set(year, group);
+    }
+    return [...years.values()].sort((a, b) => a.period.localeCompare(b.period));
+  }
+
   function renderCharts(result) {
     const supported = result.units.comparable && result.diagnostics.valueAggregatable;
     const chartAvailable = Boolean(window.Chart);
     const selectedFlow = analysis.classifyFlow(result.filters.flow);
+    const categories = new Map();
+    if (result.schema.product && Number.isInteger(result.schema.product.index)) {
+      for (const record of result.recordsIncluded) {
+        const category = String(record.row[result.schema.product.index] ?? '').trim();
+        if (!category || record.value === null || record.value < 0) continue;
+        categories.set(category, (categories.get(category) ?? 0) + record.value);
+      }
+    }
     $('market-flow-card').hidden = !(supported && result.diagnostics.canCompareFlows && !selectedFlow && result.diagnostics.hasFlow && result.diagnostics.hasValue);
     $('market-partner-card').hidden = !(supported && result.diagnostics.partnersComparable && result.diagnostics.hasCountry && result.partners.length);
     $('market-period-card').hidden = !(supported && result.diagnostics.hasPeriod && result.timeSeries.length);
-    for (const key of ['flow', 'partner', 'period']) destroyChart(key);
+    $('market-category-card').hidden = !(supported && result.diagnostics.hasProduct && categories.size);
+    for (const key of ['flow', 'partner', 'period', 'category']) destroyChart(key);
     if (!supported || !chartAvailable) {
-      if (result.units.comparable && !chartAvailable) $('market-alerts').insertAdjacentHTML('beforeend', '<p>No se cargó Chart.js; los gráficos no están disponibles. Puedes consultar y exportar las tablas.</p>');
+      if (!chartAvailable) $('market-alerts').insertAdjacentHTML('beforeend', '<p>No se cargó Chart.js; los gráficos no están disponibles. Comprueba la conexión e inténtalo de nuevo; los datos de la hoja no se han modificado.</p>');
       return;
     }
     if (!result.totals.importRecords && !result.totals.exportRecords) return;
@@ -229,16 +251,30 @@
       $('market-partner-chart-note').textContent = `Primeros ${partners.length} socios; ${result.counts.partnerIncluded} registros incluidos y ${result.counts.partnerExcluded} excluidos por país ausente.`;
     }
     if (!$('market-period-card').hidden) {
+      const years = annualSeries(result.timeSeries);
       const flowDatasets = [
         { key: 'imports', label: 'Importaciones', color: colors.imports },
         { key: 'exports', label: 'Exportaciones', color: colors.exports }
       ].filter((flow) => !selectedFlow || (selectedFlow === 'import' ? flow.key === 'imports' : flow.key === 'exports'));
       state.charts.period = new Chart($('market-period-chart'), {
         type: 'line',
-        data: { labels: result.timeSeries.map((period) => period.period), datasets: flowDatasets.map((flow) => ({ label: flow.label, data: result.timeSeries.map((period) => period[flow.key]), borderColor: flow.color, backgroundColor: flow.color, tension: 0.2, pointRadius: 3 })) },
+        data: { labels: years.map((period) => period.period), datasets: flowDatasets.map((flow) => ({ label: flow.label, data: years.map((period) => period[flow.key]), borderColor: flow.color, backgroundColor: flow.color, tension: 0.2, pointRadius: 3, pointHoverRadius: 5, spanGaps: false, borderWidth: 2 })) },
         options: chartOptions()
       });
-      $('market-period-chart-note').textContent = `${result.counts.periodIncluded} registros incluidos y ${result.counts.periodExcluded} excluidos por periodo ausente o inválido.`;
+      $('market-period-chart-note').textContent = `Agregación anual de ${result.timeSeries.length} periodos reconocidos; ${result.counts.periodIncluded} registros incluidos y ${result.counts.periodExcluded} excluidos por periodo ausente o inválido.`;
+    }
+    if (!$('market-category-card').hidden) {
+      const palette = ['#2869bb', '#38a58e', '#e5a34e', '#8170b9', '#58a2bc', '#cc7890', '#7a9b60', '#d48d61', '#667eac', '#6ca896'];
+      const categoryValues = [...categories.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'es'));
+      state.charts.category = new Chart($('market-category-chart'), {
+        type: 'doughnut',
+        data: {
+          labels: categoryValues.map(([category]) => category),
+          datasets: [{ label: `Valor comercial (${result.units.label})`, data: categoryValues.map(([, value]) => value), backgroundColor: categoryValues.map((_, index) => palette[index % palette.length]), borderColor: '#fff', borderWidth: 3, hoverOffset: 7 }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, cutout: '64%', plugins: { ...chartOptions().plugins, tooltip: { callbacks: { label: (context) => `${context.label}: ${formatNumber(context.parsed)} ${result.units.label}` } } } }
+      });
+      $('market-category-chart-note').textContent = `${categoryValues.length} categorías con valores comerciales no negativos incluidos; la distribución respeta los filtros activos.`;
     }
   }
 
@@ -310,6 +346,7 @@
     if (!dataset || !dataset.result || !dataset.headers.length) {
       $('market-empty').hidden = false;
       $('market-workspace').hidden = true;
+      for (const key of ['flow', 'partner', 'period', 'category']) $(`market-${key}-card`).hidden = true;
       $('market-source').textContent = 'El análisis usará la hoja activa de Preparación de datos.';
       destroyAllCharts();
       state.result = null;

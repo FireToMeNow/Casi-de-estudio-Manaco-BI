@@ -13,6 +13,16 @@
     revenue: ['ingresos por ventas', 'ingreso por ventas', 'ventas netas', 'sales revenue', 'net sales', 'sales income', 'ventas', 'venta', 'revenue'],
     cost: ['costo de ventas', 'costos de venta', 'cost of goods sold', 'cost of sales', 'cogs']
   };
+  const filterLabels = {
+    reportingCountry: 'País reportante',
+    country: 'Socio comercial',
+    product: 'Producto o categoría',
+    period: 'Periodo',
+    flow: 'Flujo',
+    movement: 'Tipo de movimiento'
+  };
+  const filterState = { inventarios: {}, pronosticos: {}, rentabilidad: {} };
+  const charts = {};
 
   function normalize(value) {
     return String(value ?? '')
@@ -49,6 +59,43 @@
     return nonEmptyRows(headers, rows).some(({ row }) => !String(row[index] ?? '').trim());
   }
 
+  function moduleFilterOptions(view, headers, rows) {
+    const schema = market.resolveSchema(headers);
+    const roles = view === 'inventarios'
+      ? ['reportingCountry', 'country', 'product', 'period']
+      : ['reportingCountry', 'country', 'product', 'flow', ...(view === 'pronosticos' ? [] : ['period'])];
+    const options = {};
+    for (const role of roles) {
+      const column = schema[role];
+      if (column) options[role] = [...new Set(rows
+        .map((row) => role === 'period'
+          ? market.normalizePeriod(row[column.index])
+          : String(row[column.index] ?? '').trim())
+        .filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
+    }
+    if (view === 'inventarios') {
+      const movement = findColumn(headers, inventoryAliases.movement);
+      if (movement.column) {
+        options.movement = [...new Set(rows.map((row) => String(row[movement.column.index] ?? '').trim()).filter(Boolean))]
+          .sort((a, b) => a.localeCompare(b, 'es'));
+      }
+    }
+    return options;
+  }
+
+  function applyModuleFilters(view, headers, rows, filters) {
+    const schema = market.resolveSchema(headers);
+    const movement = view === 'inventarios' ? findColumn(headers, inventoryAliases.movement) : null;
+    return rows.filter((row) => {
+      for (const role of ['reportingCountry', 'country', 'product', 'flow']) {
+        if (filters[role] && schema[role] && String(row[schema[role].index] ?? '').trim() !== filters[role]) return false;
+      }
+      if (filters.period && schema.period && market.normalizePeriod(row[schema.period.index]) !== filters.period) return false;
+      if (filters.movement && movement?.column && String(row[movement.column.index] ?? '').trim() !== filters.movement) return false;
+      return true;
+    });
+  }
+
   function countryIndexes(headers, schema) {
     if (schema.country) return [schema.country.index];
     const candidates = schema.ambiguities.find((ambiguity) => ambiguity.role === 'country')?.headers ?? [];
@@ -76,7 +123,8 @@
     return incoming ? 'incoming' : 'outgoing';
   }
 
-  function analyzeInventory(headers, rows) {
+  function analyzeInventory(headers, rows, filters = {}) {
+    rows = applyModuleFilters('inventarios', headers, rows, filters);
     const roles = market.resolveSchema(headers);
     const movement = findColumn(headers, inventoryAliases.movement);
     const stock = findColumn(headers, inventoryAliases.stock);
@@ -226,6 +274,7 @@
       incomingRecords: sum.incomingRecords + product.incomingRecords,
       outgoingRecords: sum.outgoingRecords + product.outgoingRecords
     }), { incoming: 0, outgoing: 0, incomingRecords: 0, outgoingRecords: 0 });
+    const stockProducts = products.filter((product) => product.stock !== null);
     const notes = [];
     if (!stock.column) notes.push('No se detectó existencia/stock actual; no se generan alertas de nivel de stock.');
     else if (!reorder.column) notes.push('No se detectó punto de reposición o stock mínimo; se muestra la existencia consistente, sin clasificar alertas.');
@@ -248,6 +297,8 @@
       totals,
       alertsEnabled,
       alertCount: products.filter((product) => product.lowStock).length,
+      stockTotal: stockProducts.length ? stockProducts.reduce((sum, product) => sum + product.stock, 0) : null,
+      stockProductCount: stockProducts.length,
       invalidQuantities,
       unknownMovements,
       missingProducts,
@@ -259,7 +310,8 @@
     };
   }
 
-  function analyzeForecast(headers, rows) {
+  function analyzeForecast(headers, rows, filters = {}) {
+    rows = applyModuleFilters('pronosticos', headers, rows, filters);
     const marketResult = market.analyzeMarket(headers, rows);
     const reasons = [];
     const reportingCountries = market.getFilterOptions(headers, rows).reportingCountry;
@@ -290,12 +342,30 @@
         const complete = marketResult.timeSeries.every((point) => Number.isFinite(point[flow.key]));
         if (!complete) continue;
         const last = marketResult.timeSeries[marketResult.timeSeries.length - 1];
+        const validationErrors = [];
+        for (let index = 3; index < marketResult.timeSeries.length; index += 1) {
+          const actual = marketResult.timeSeries[index][flow.key];
+          const previous = marketResult.timeSeries[index - 1][flow.key];
+          if (Number.isFinite(actual) && Number.isFinite(previous)) {
+            validationErrors.push({ absolute: Math.abs(actual - previous), actual });
+          }
+        }
+        const nonZeroErrors = validationErrors.filter((error) => error.actual !== 0);
+        const accuracy = validationErrors.length ? {
+          observations: validationErrors.length,
+          mapeObservations: nonZeroErrors.length,
+          mae: validationErrors.reduce((sum, error) => sum + error.absolute, 0) / validationErrors.length,
+          mape: nonZeroErrors.length
+            ? nonZeroErrors.reduce((sum, error) => sum + error.absolute / Math.abs(error.actual) * 100, 0) / nonZeroErrors.length
+            : null
+        } : null;
         forecasts.push({
           flow: flow.label,
           year: String(Number(last.period) + 1),
           value: last[flow.key],
           sourceYear: last.period,
-          sourceValue: last[flow.key]
+          sourceValue: last[flow.key],
+          accuracy
         });
       }
     }
@@ -339,7 +409,8 @@
     return distinct.length === 1 && distinct[0] ? { code: distinct[0], scale } : null;
   }
 
-  function analyzeProfitability(headers, rows) {
+  function analyzeProfitability(headers, rows, filters = {}) {
+    rows = applyModuleFilters('rentabilidad', headers, rows, filters);
     const revenue = findColumn(headers, profitabilityAliases.revenue, ['cost', 'costo', 'cantidad', 'quantity', 'qty', 'volumen', 'unidades', 'units', 'pares', 'pairs']);
     const cost = findColumn(headers, profitabilityAliases.cost);
     const marketSchema = market.resolveSchema(headers);
@@ -410,6 +481,9 @@
     let revenueTotal = 0;
     let costTotal = 0;
     let validRecords = 0;
+    const categoryColumn = marketSchema.product;
+    const categories = new Map();
+    let missingCategoryRecords = 0;
     for (const { row } of sourceRows) {
       const rowRevenue = market.parseNumber(row[revenue.column.index]);
       const rowCost = market.parseNumber(row[cost.column.index]);
@@ -417,6 +491,18 @@
       revenueTotal += rowRevenue;
       costTotal += rowCost;
       validRecords += 1;
+      if (categoryColumn) {
+        const category = String(row[categoryColumn.index] ?? '').trim();
+        if (!category) {
+          missingCategoryRecords += 1;
+          continue;
+        }
+        const totals = categories.get(category) ?? { category, revenue: 0, cost: 0, records: 0 };
+        totals.revenue += rowRevenue;
+        totals.cost += rowCost;
+        totals.records += 1;
+        categories.set(category, totals);
+      }
     }
     if (validRecords === 0) {
       return {
@@ -439,6 +525,11 @@
       validRecords,
       excludedRecords: sourceRows.length - validRecords,
       worldExcluded: worldRows.length,
+      categoryColumn: categoryColumn?.header ?? null,
+      missingCategoryRecords,
+      categories: [...categories.values()]
+        .map((category) => ({ ...category, grossMargin: category.revenue - category.cost }))
+        .sort((a, b) => b.revenue - a.revenue || a.category.localeCompare(b.category, 'es')),
       unit: revenueUnit.scale ? `${revenueUnit.code} (${revenueUnit.scale})` : revenueUnit.code,
       formula: 'Margen bruto = ingresos por ventas − costo de ventas; margen % = margen bruto / ingresos × 100 (solo si ingresos > 0).',
       note: 'No se calcula rentabilidad neta, costos indirectos, impuestos ni retorno. El valor comercial por par no equivale a margen.'
@@ -449,6 +540,49 @@
     return String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
   }
 
+  function destroyCharts(view) {
+    for (const [key, chart] of Object.entries(charts)) {
+      if (!key.startsWith(`${view}-`)) continue;
+      chart.destroy();
+      delete charts[key];
+    }
+  }
+
+  function destroyOtherCharts(view) {
+    for (const key of Object.keys(charts)) {
+      if (key.startsWith(`${view}-`)) continue;
+      charts[key].destroy();
+      delete charts[key];
+    }
+  }
+
+  function renderFilters(view, headers, rows) {
+    const container = root.document.getElementById(`${view}-filters`);
+    const options = moduleFilterOptions(view, headers, rows);
+    const filters = filterState[view];
+    const roles = Object.keys(options);
+    for (const role of roles) {
+      if (!options[role].includes(filters[role])) filters[role] = '';
+    }
+    container.innerHTML = roles.length
+      ? `${roles.map((role) => `<label class="module-filter"><span>${filterLabels[role]}</span><select id="${view}-${role}-filter" data-module-filter="${role}"><option value="">Todos</option>${options[role].map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join('')}</select></label>`).join('')}<button class="button button-secondary" id="${view}-reset-filters" type="button">Limpiar filtros</button>`
+      : '<p class="module-filter-empty">No hay columnas reconocidas para filtrar; se conservan los filtros definidos por el archivo.</p>';
+    for (const role of roles) {
+      const select = root.document.getElementById(`${view}-${role}-filter`);
+      select.value = filters[role];
+      select.addEventListener('change', (event) => {
+        filters[role] = event.target.value;
+        render(view, datasetForView);
+      });
+    }
+    const reset = root.document.getElementById(`${view}-reset-filters`);
+    if (reset) reset.addEventListener('click', () => {
+      filterState[view] = {};
+      render(view, datasetForView);
+    });
+    const datasetForView = { headers, rows };
+  }
+
   function renderEmptyState(title, description, needs = []) {
     return `<div class="module-empty"><strong>${escapeHtml(title)}</strong><p>${escapeHtml(description)}</p>${needs.length ? `<ul>${needs.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : ''}</div>`;
   }
@@ -457,10 +591,52 @@
     return Number.isFinite(value) ? new Intl.NumberFormat('es-BO', { maximumFractionDigits: 2 }).format(value) : 'No disponible';
   }
 
-  function renderInventory(dataset) {
-    const result = analyzeInventory(dataset.headers, dataset.rows);
+  function chartOptions(horizontal = false) {
+    return {
+      responsive: true,
+      maintainAspectRatio: false,
+      indexAxis: horizontal ? 'y' : 'x',
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8, padding: 18, font: { family: 'DM Sans', size: 11 } } },
+        tooltip: { callbacks: { label: (context) => `${context.dataset.label}: ${formatNumber(context.parsed[horizontal ? 'x' : 'y'])}` } }
+      },
+      scales: {
+        x: { beginAtZero: true, grid: { color: '#e9eef5' }, ticks: { font: { family: 'DM Sans', size: 10 } } },
+        y: { beginAtZero: !horizontal, grid: { color: horizontal ? '#e9eef5' : 'transparent' }, ticks: { font: { family: 'DM Sans', size: 10 } } }
+      }
+    };
+  }
+
+  function chartCard(id, title, canvasLabel) {
+    return `<article class="module-chart-card"><h3>${escapeHtml(title)}</h3><div class="module-chart"><canvas id="${id}" role="img" aria-label="${escapeHtml(canvasLabel)}"></canvas></div></article>`;
+  }
+
+  function chartNotice() {
+    return typeof root.Chart === 'function'
+      ? ''
+      : '<p class="module-chart-unavailable" role="status">Chart.js no está disponible. Comprueba la conexión e inténtalo de nuevo para visualizar los gráficos.</p>';
+  }
+
+  function createChart(view, id, configuration) {
+    if (typeof root.Chart !== 'function') return;
+    charts[`${view}-${id}`] = new root.Chart(root.document.getElementById(id), configuration);
+  }
+
+  function renderInventory(dataset, result) {
     if (!result.available) return renderEmptyState('Análisis de inventario no disponible', result.message, result.needs);
-    const metrics = `<div class="module-metrics"><article><span>Entradas</span><strong>${formatNumber(result.totals.incoming)} ${escapeHtml(result.quantityUnit)}</strong><small>${result.totals.incomingRecords} movimientos</small></article><article><span>Salidas</span><strong>${formatNumber(result.totals.outgoing)} ${escapeHtml(result.quantityUnit)}</strong><small>${result.totals.outgoingRecords} movimientos</small></article><article><span>Productos</span><strong>${result.products.length}</strong><small>${result.message}</small></article><article><span>Alertas de stock</span><strong>${result.alertsEnabled ? result.alertCount : 'No calculadas'}</strong><small>${result.alertsEnabled ? 'Stock actual ≤ punto de reposición' : 'Requiere existencia y umbral con unidad compatible'}</small></article></div>`;
+    const stockMetric = result.stockTotal === null
+      ? '<article><span>Existencias actuales</span><strong>No disponibles</strong><small>Se requiere una columna reconocible de stock con valores consistentes</small></article>'
+      : `<article><span>Existencias actuales</span><strong>${formatNumber(result.stockTotal)} ${escapeHtml(result.stockUnit ?? '')}</strong><small>${result.stockProductCount} producto(s) o ubicaciones con stock consistente</small></article>`;
+    const metrics = `<div class="module-metrics"><article><span>Entradas</span><strong>${formatNumber(result.totals.incoming)} ${escapeHtml(result.quantityUnit)}</strong><small>${result.totals.incomingRecords} movimientos</small></article><article><span>Salidas</span><strong>${formatNumber(result.totals.outgoing)} ${escapeHtml(result.quantityUnit)}</strong><small>${result.totals.outgoingRecords} movimientos</small></article>${stockMetric}<article><span>Productos</span><strong>${result.products.length}</strong><small>${result.message}</small></article><article><span>Alertas de stock</span><strong>${result.alertsEnabled ? result.alertCount : 'No calculadas'}</strong><small>${result.alertsEnabled ? 'Stock actual ≤ punto de reposición' : 'Requiere existencia y umbral comparables'}</small></article></div>`;
+    const stockProducts = result.products.filter((product) => product.stock !== null).slice(0, 10);
+    const stockChart = stockProducts.length
+      ? chartCard('inventory-stock-chart', 'Existencias y punto de reposición', 'Existencias actuales por producto y punto de reposición cuando la unidad es comparable')
+      : '';
+    const stockNote = result.stockProductCount && !result.alertsEnabled
+      ? '<p class="module-chart-note">Se muestra el stock disponible; el umbral no se compara porque faltan unidades o cobertura consistentes.</p>'
+      : '';
+    const chartsMarkup = `<div class="module-chart-grid">${chartCard('inventory-movements-chart', 'Productos con mayor movimiento', `Entradas y salidas por producto; cantidades en ${result.quantityUnit}`)}${stockChart}</div>${stockNote}${chartNotice()}`;
     const table = `<div class="module-table-wrap"><table><thead><tr><th>Producto</th><th>Entradas</th><th>Salidas</th><th>Existencia actual</th><th>Punto de reposición</th><th>Estado</th></tr></thead><tbody>${result.products.map((product) => {
       const status = product.inconsistentStock || product.inconsistentReorder
         ? 'Datos faltantes/inconsistentes'
@@ -472,36 +648,113 @@
       return `<tr><td>${escapeHtml(product.product)}</td><td>${formatNumber(product.incoming)}</td><td>${formatNumber(product.outgoing)}</td><td>${formatNumber(product.stock)}</td><td>${formatNumber(product.reorder)}</td><td>${status}</td></tr>`;
     }).join('')}</tbody></table></div>`;
     const notes = result.notes.length ? `<ul class="module-notes">${result.notes.map((note) => `<li>${escapeHtml(note)}</li>`).join('')}</ul>` : '';
-    return `${metrics}${table}${notes}<p class="module-method">Solo se agrupan movimientos clasificados explícitamente. Los valores se agregan tal como aparecen; valida el nivel de detalle y los duplicados de la fuente antes de actuar.</p>`;
+    return `${metrics}${chartsMarkup}${table}${notes}<p class="module-method">Solo se agrupan movimientos clasificados explícitamente. Los valores se agregan tal como aparecen; valida el nivel de detalle y los duplicados de la fuente antes de actuar.</p>`;
   }
 
-  function renderForecast(dataset) {
-    const result = analyzeForecast(dataset.headers, dataset.rows);
+  function renderForecast(dataset, result) {
     if (!result.available) return renderEmptyState('Pronóstico no disponible para estos datos', 'No se generó una estimación: se requieren historial y calidad suficientes. Los criterios se muestran a continuación.', result.reasons);
+    const accuracyMetrics = result.forecasts.map((forecast) => `<article><span>Error histórico · ${escapeHtml(forecast.flow)}</span><strong>${forecast.accuracy ? `MAE ${formatNumber(forecast.accuracy.mae)} ${escapeHtml(result.unit)}` : 'Sin observaciones de validación'}</strong><small>${forecast.accuracy ? `${forecast.accuracy.observations} proyección(es) retrospectiva(s); MAPE ${forecast.accuracy.mape === null ? 'no calculable: todos los valores reales son cero' : `${formatNumber(forecast.accuracy.mape)} % en ${forecast.accuracy.mapeObservations} observación(es) distintas de cero`}.` : 'Se requieren al menos 4 años consecutivos para validar el error de un pronóstico naïve.'}</small></article>`).join('');
+    const metrics = `<div class="module-metrics"><article><span>País reportante</span><strong>${escapeHtml(result.country)}</strong><small>Único país reportante reconocido</small></article><article><span>Método</span><strong>Naïve</strong><small>Persistencia del último año</small></article><article><span>Periodo proyectado</span><strong>${escapeHtml([...new Set(result.forecasts.map((forecast) => forecast.year))].join(', '))}</strong><small>Horizonte: ${escapeHtml(result.horizon)}</small></article><article><span>Historial usado</span><strong>${result.history.length} años</strong><small>Continuos y completos</small></article>${accuracyMetrics}</div>`;
     const rows = result.history.map((point) => `<tr><td>${escapeHtml(point.period)}</td><td>${formatNumber(point.imports)}</td><td>${formatNumber(point.exports)}</td><td>Observado</td></tr>`);
     for (const forecast of result.forecasts) rows.push(`<tr><td>${escapeHtml(forecast.year)}</td><td>${forecast.flow === 'Importaciones' ? formatNumber(forecast.value) : '—'}</td><td>${forecast.flow === 'Exportaciones' ? formatNumber(forecast.value) : '—'}</td><td>Pronóstico naïve (${escapeHtml(forecast.flow)})</td></tr>`);
-    return `<div class="module-metrics"><article><span>País reportante</span><strong>${escapeHtml(result.country)}</strong><small>Único país reportante reconocido</small></article><article><span>Método</span><strong>Naïve</strong><small>Persistencia del último año</small></article><article><span>Horizonte</span><strong>${escapeHtml(result.horizon)}</strong><small>Una observación futura</small></article><article><span>Historial usado</span><strong>${result.history.length} años</strong><small>Continuos y completos</small></article></div><div class="module-table-wrap"><table><thead><tr><th>Año</th><th>Importaciones (${escapeHtml(result.unit)})</th><th>Exportaciones (${escapeHtml(result.unit)})</th><th>Tipo</th></tr></thead><tbody>${rows.join('')}</tbody></table></div><p class="module-method">${escapeHtml(result.method)} ${escapeHtml(result.limitations)}</p>`;
+    return `${metrics}<section class="module-chart-grid">${chartCard('forecast-chart', 'Evolución y proyección anual', `Valores comerciales anuales históricos y pronóstico para ${[...new Set(result.forecasts.map((forecast) => forecast.year))].join(', ')}`)}</section>${chartNotice()}<div class="module-table-wrap"><table><thead><tr><th>Año</th><th>Importaciones (${escapeHtml(result.unit)})</th><th>Exportaciones (${escapeHtml(result.unit)})</th><th>Tipo</th></tr></thead><tbody>${rows.join('')}</tbody></table></div><p class="module-method">${escapeHtml(result.method)} ${escapeHtml(result.limitations)} Las proyecciones son de flujos comerciales del archivo y no representan demanda ni ventas de MANACO.</p>`;
   }
 
-  function renderProfitability(dataset) {
-    const result = analyzeProfitability(dataset.headers, dataset.rows);
+  function renderProfitability(dataset, result) {
     if (!result.available) {
       const duplicateNote = result.duplicateRows ? ` Se detectaron ${result.duplicateRows} fila(s) implicadas en duplicados exactos.` : '';
       return renderEmptyState('Análisis de rentabilidad no disponible', `${result.reasons.join('; ')}.${duplicateNote} No se sustituuyen datos ausentes por ceros.`, result.reasons);
     }
-    return `<div class="module-metrics"><article><span>Ingresos por ventas</span><strong>${formatNumber(result.revenue)} ${escapeHtml(result.unit)}</strong><small>${result.validRecords} registros completos</small></article><article><span>Costo de ventas</span><strong>${formatNumber(result.cost)} ${escapeHtml(result.unit)}</strong><small>Moneda y escala compatibles</small></article><article><span>Margen bruto</span><strong>${formatNumber(result.grossMargin)} ${escapeHtml(result.unit)}</strong><small>Ingresos − costo de ventas</small></article><article><span>Margen bruto porcentual</span><strong>${result.marginRate === null ? 'No calculado' : `${formatNumber(result.marginRate)} %`}</strong><small>${result.marginRate === null ? 'Ingresos totales iguales a cero' : 'Margen bruto / ingresos × 100'}</small></article></div><p class="module-method">${escapeHtml(result.formula)} ${escapeHtml(result.note)} ${result.excludedRecords ? `${result.excludedRecords} registro(s) incompletos o incompatibles excluidos.` : ''}</p>`;
+    const categories = result.categories.slice(0, 10);
+    const categoryLabel = result.categoryColumn ?? 'Total filtrado';
+    const categoryChart = categories.length
+      ? chartCard('profitability-category-chart', `Ingresos por ${escapeHtml(categoryLabel)}`, `Distribución real de ingresos por ${categoryLabel}`)
+      : '<article class="module-chart-card"><h3>Distribución por producto o categoría</h3><p class="module-chart-note">No se detectó una columna de producto o categoría; no se pueden desglosar los ingresos. El gráfico de totales mantiene las cifras verificadas.</p></article>';
+    const chartsMarkup = `<div class="module-chart-grid">${chartCard('profitability-margins-chart', 'Ingresos, costos y margen bruto por categoría', 'Comparación de ingresos por ventas, costo de ventas y margen bruto')}${categoryChart}</div>${chartNotice()}`;
+    const categoryNote = result.missingCategoryRecords
+      ? ` ${result.missingCategoryRecords} registro(s) válidos sin categoría se excluyen solo del desglose por producto; conservan su inclusión en los totales.`
+      : '';
+    return `<div class="module-metrics"><article><span>Ingresos por ventas</span><strong>${formatNumber(result.revenue)} ${escapeHtml(result.unit)}</strong><small>${result.validRecords} registros completos</small></article><article><span>Costo de ventas</span><strong>${formatNumber(result.cost)} ${escapeHtml(result.unit)}</strong><small>Moneda y escala compatibles</small></article><article><span>Margen bruto</span><strong>${formatNumber(result.grossMargin)} ${escapeHtml(result.unit)}</strong><small>Ingresos − costo de ventas</small></article><article><span>Margen bruto porcentual</span><strong>${result.marginRate === null ? 'No calculado' : `${formatNumber(result.marginRate)} %`}</strong><small>${result.marginRate === null ? 'Ingresos totales iguales a cero' : 'Margen bruto / ingresos × 100'}</small></article></div>${chartsMarkup}<p class="module-method">${escapeHtml(result.formula)} ${escapeHtml(result.note)} ${result.excludedRecords ? `${result.excludedRecords} registro(s) incompletos o incompatibles excluidos.` : ''}${categoryNote}</p>`;
   }
 
   function render(view, dataset) {
     const target = root.document.getElementById(`${view}-results`);
-    if (!target) return;
+    if (!target || !Object.hasOwn(filterState, view)) return;
+    destroyCharts(view);
+    destroyOtherCharts(view);
+    const filters = root.document.getElementById(`${view}-filters`);
     if (!dataset || !dataset.headers?.length) {
+      filterState[view] = {};
+      filters.innerHTML = '';
       target.innerHTML = renderEmptyState('Aún no hay datos cargados', 'Carga un archivo en Preparación de datos para evaluar si contiene las columnas necesarias. No se muestran ejemplos.');
       return;
     }
-    if (view === 'inventarios') target.innerHTML = renderInventory(dataset);
-    else if (view === 'pronosticos') target.innerHTML = renderForecast(dataset);
-    else if (view === 'rentabilidad') target.innerHTML = renderProfitability(dataset);
+    renderFilters(view, dataset.headers, dataset.rows);
+    const filteredDataset = { ...dataset, rows: applyModuleFilters(view, dataset.headers, dataset.rows, filterState[view]) };
+    if (view === 'inventarios') {
+      const result = analyzeInventory(dataset.headers, filteredDataset.rows);
+      target.innerHTML = renderInventory(filteredDataset, result);
+      if (!result.available) return;
+      const leaders = result.products.slice().sort((a, b) => b.incoming + b.outgoing - a.incoming - a.outgoing).slice(0, 10);
+      const stockProducts = result.products.filter((product) => product.stock !== null).slice(0, 10);
+      createChart(view, 'inventory-movements-chart', {
+        type: 'bar',
+        data: { labels: leaders.map((product) => product.product), datasets: [
+          { label: 'Entradas', data: leaders.map((product) => product.incoming), backgroundColor: '#2869bb', borderRadius: 5 },
+          { label: 'Salidas', data: leaders.map((product) => product.outgoing), backgroundColor: '#38a58e', borderRadius: 5 }
+        ] },
+        options: chartOptions(true)
+      });
+      if (result.stockProductCount > 0) createChart(view, 'inventory-stock-chart', {
+        type: 'bar',
+        data: { labels: stockProducts.map((product) => product.product), datasets: [
+          { label: `Existencia actual (${result.stockUnit ?? 'unidad no confirmada'})`, data: stockProducts.map((product) => product.stock), backgroundColor: '#2869bb', borderRadius: 5 },
+          ...(result.alertsEnabled ? [{ label: 'Punto de reposición', data: stockProducts.map((product) => product.reorder), backgroundColor: '#d99343', borderRadius: 5 }] : [])
+        ] },
+        options: chartOptions(true)
+      });
+    }
+    if (view === 'pronosticos') {
+      const result = analyzeForecast(dataset.headers, filteredDataset.rows);
+      target.innerHTML = renderForecast(filteredDataset, result);
+      if (!result.available) return;
+      const labels = [...result.history.map((point) => point.period), ...new Set(result.forecasts.map((forecast) => forecast.year).filter((year) => !result.history.some((point) => point.period === year)))];
+      const colors = { Importaciones: '#2869bb', Exportaciones: '#38a58e' };
+      const datasets = result.forecasts.flatMap((forecast) => {
+        const field = forecast.flow === 'Importaciones' ? 'imports' : 'exports';
+        const history = result.history.map((point) => point[field]);
+        return [
+          { label: `${forecast.flow} observadas`, data: [...history, null], borderColor: colors[forecast.flow], backgroundColor: colors[forecast.flow], tension: .24, pointRadius: 3, spanGaps: false },
+          { label: `${forecast.flow} · proyección naïve`, data: [...history.map((value, index) => index === history.length - 1 ? value : null), forecast.value], borderColor: colors[forecast.flow], backgroundColor: colors[forecast.flow], borderDash: [6, 4], spanGaps: false, pointRadius: 4, pointStyle: 'rectRot' }
+        ];
+      });
+      createChart(view, 'forecast-chart', {
+        type: 'line',
+        data: { labels, datasets },
+        options: { ...chartOptions(), interaction: { mode: 'index', intersect: false } }
+      });
+    }
+    if (view === 'rentabilidad') {
+      const result = analyzeProfitability(dataset.headers, filteredDataset.rows);
+      target.innerHTML = renderProfitability(filteredDataset, result);
+      if (!result.available) return;
+      const categories = result.categories.slice(0, 10);
+      createChart(view, 'profitability-margins-chart', {
+        type: 'bar',
+        data: { labels: categories.length ? categories.map((category) => category.category) : ['Total filtrado'], datasets: [
+          { label: 'Ingresos por ventas', data: categories.length ? categories.map((category) => category.revenue) : [result.revenue], backgroundColor: '#2869bb', borderRadius: 5 },
+          { label: 'Costo de ventas', data: categories.length ? categories.map((category) => category.cost) : [result.cost], backgroundColor: '#d99343', borderRadius: 5 },
+          { label: 'Margen bruto', data: categories.length ? categories.map((category) => category.grossMargin) : [result.grossMargin], backgroundColor: '#38a58e', borderRadius: 5 }
+        ] },
+        options: chartOptions(true)
+      });
+      const profitabilitySchema = market.resolveSchema(dataset.headers);
+      if (profitabilitySchema.product && categories.length) createChart(view, 'profitability-category-chart', {
+        type: 'doughnut',
+        data: { labels: categories.map((category) => category.category), datasets: [{ label: 'Ingresos por ventas', data: categories.map((category) => category.revenue), backgroundColor: ['#2869bb', '#38a58e', '#e5a34e', '#806fbc', '#5b9ab7', '#c67d91', '#7d9a60', '#cf9662', '#657cae', '#73aa9b'], borderColor: '#fff', borderWidth: 3, hoverOffset: 7 }] },
+        options: { responsive: true, maintainAspectRatio: false, cutout: '64%', plugins: chartOptions().plugins }
+      });
+    }
   }
 
   const api = { analyzeForecast, analyzeInventory, analyzeProfitability, render };
