@@ -1,0 +1,154 @@
+{
+  "schemaVersion": 1,
+  "title": "Referencia verificable del caso MANACO · comercio exterior",
+  "provenance": {
+    "file": "Bae de Datos MANACO - INTERMEDIO (1).xlsx",
+    "sheet": "Base de Datos",
+    "derivedOn": "2026-10-20",
+    "method": "Agregados recalculados desde las 240 filas del Excel: valor USD, pares, flujo, categoría, socio y año. No se guardan filas personales ni datos internos de MANACO.",
+    "notManacoData": true,
+    "validationUse": "Verificar afirmaciones descriptivas sobre la base del ejercicio, no certificar decisiones reales de MANACO."
+  },
+  "dataset": {
+    "reporter": "España",
+    "periods": ["2020", "2021", "2022", "2023", "2024"],
+    "recordCount": 240,
+    "worldRows": 0,
+    "exactDuplicateRows": 0,
+    "missingCells": 0,
+    "currency": "USD",
+    "flows": {
+      "Importación": {
+        "valueUsd": 18506091720.31,
+        "pairs": 751088918,
+        "records": 120,
+        "weightedUsdPerPair": 24.64
+      },
+      "Exportación": {
+        "valueUsd": 10917349349.48,
+        "pairs": 410771647,
+        "records": 120,
+        "weightedUsdPerPair": 26.58
+      }
+    },
+    "balanceExportMinusImportUsd": -7588742370.83,
+    "exportCoveragePercent": 59.0,
+    "categories": [
+      {
+        "code": "640411",
+        "name": "Calzado deportivo con suela de caucho/plástico",
+        "import": { "valueUsd": 6447479590.82, "pairs": 245871098, "records": 40, "weightedUsdPerPair": 26.22 },
+        "export": { "valueUsd": 2173925768.82, "pairs": 84486912, "records": 40, "weightedUsdPerPair": 25.73 }
+      },
+      {
+        "code": "640399",
+        "name": "Calzado con suela de caucho/plástico y parte superior de cuero",
+        "import": { "valueUsd": 11709684709.81, "pairs": 497500841, "records": 40, "weightedUsdPerPair": 23.54 },
+        "export": { "valueUsd": 8514235202.14, "pairs": 320751937, "records": 40, "weightedUsdPerPair": 26.54 }
+      },
+      {
+        "code": "640420",
+        "name": "Calzado con suela de cuero y parte superior de cuero/material similar",
+        "import": { "valueUsd": 348927419.68, "pairs": 7716979, "records": 40, "weightedUsdPerPair": 45.22 },
+        "export": { "valueUsd": 229188378.52, "pairs": 5532798, "records": 40, "weightedUsdPerPair": 41.42 }
+      }
+    ],
+    "topImportPartnersByValueUsd": [
+      { "name": "Grecia", "valueUsd": 2109633522.28 },
+      { "name": "Países Bajos", "valueUsd": 1754055489.66 },
+      { "name": "Vietnam", "valueUsd": 1517649564.18 },
+      { "name": "Irlanda", "valueUsd": 912696642.72 },
+      { "name": "Turquía", "valueUsd": 907971137.88 },
+      { "name": "Rumanía", "valueUsd": 830586023.39 },
+      { "name": "Finlandia", "valueUsd": 824546730.23 },
+      { "name": "Brasil", "valueUsd": 786102130.85 },
+      { "name": "Camboya", "valueUsd": 724802631.86 },
+      { "name": "República Checa", "valueUsd": 595776324.46 }
+    ],
+    "annualRecordCounts": {
+      "2020": 28,
+      "2021": 34,
+      "2022": 48,
+      "2023": 48,
+      "2024": 82
+    }
+  },
+  "facts": [
+    {
+      "id": "external-scope",
+      "label": "La fuente reporta comercio de España, no datos operativos de MANACO",
+      "terms": ["españa"],
+      "fieldIds": ["s2_finding_1", "s2_finding_2", "s2_finding_3", "s2_limit_1", "s2_limit_2", "s2_question"],
+      "severity": "high",
+      "notEquivalentTerms": ["manaco"]
+    },
+    {
+      "id": "imports",
+      "label": "Importaciones: 18,506.09 millones USD y 751.09 millones de pares",
+      "keywordsAny": ["import", "importación"],
+      "metrics": [
+        { "value": 18506091720.31, "unitScale": 1000000, "tolerancePercent": 0.6, "label": "valor USD (admite expresión en millones)" },
+        { "value": 751088918, "unitScale": 1000000, "tolerancePercent": 0.6, "label": "pares (admite expresión en millones)" }
+      ]
+    },
+    {
+      "id": "exports",
+      "label": "Exportaciones: 10,917.35 millones USD y 410.77 millones de pares",
+      "keywordsAny": ["export"],
+      "metrics": [
+        { "value": 10917349349.48, "unitScale": 1000000, "tolerancePercent": 0.6, "label": "valor USD (admite expresión en millones)" },
+        { "value": 410771647, "unitScale": 1000000, "tolerancePercent": 0.6, "label": "pares (admite expresión en millones)" }
+      ]
+    },
+    {
+      "id": "category-640399",
+      "label": "La categoría 640399 concentra la mayor cantidad de pares",
+      "keywordsAny": ["640399", "caucho"],
+      "metrics": [
+        { "value": 497500841, "unitScale": 1000000, "tolerancePercent": 0.7, "label": "pares importados, en millones" },
+        { "value": 320751937, "unitScale": 1000000, "tolerancePercent": 0.7, "label": "pares exportados, en millones" }
+      ]
+    },
+    {
+      "id": "category-640420",
+      "label": "La categoría 640420 tiene valor unitario más alto y bajo volumen",
+      "keywordsAny": ["640420", "suela de cuero"],
+      "metrics": [
+        { "value": 45.22, "unitScale": 1, "tolerancePercent": 1.2, "label": "USD/par importado" },
+        { "value": 41.42, "unitScale": 1, "tolerancePercent": 1.2, "label": "USD/par exportado" }
+      ]
+    },
+    {
+      "id": "import-partners",
+      "label": "Grecia, Países Bajos y Vietnam son los tres principales socios por valor de importación",
+      "keywordsAny": ["grecia", "países bajos", "paises bajos", "vietnam"]
+    },
+    {
+      "id": "coverage",
+      "label": "La cobertura exportaciones/importaciones es aproximadamente 59%",
+      "keywordsAny": ["cobertura", "import"],
+      "metrics": [
+        { "value": 59.0, "unitScale": 1, "tolerancePercent": 1.0, "label": "porcentaje de cobertura" }
+      ]
+    },
+    {
+      "id": "year-coverage",
+      "label": "La cantidad de registros por año es desigual (28 en 2020 frente a 82 en 2024)",
+      "termsAll": ["2020", "2024"],
+      "keywordsAny": ["registro", "desbalance", "crecimiento", "compar"],
+      "metrics": [
+        { "value": 28, "unitScale": 1, "tolerancePercent": 0, "label": "registros de 2020" },
+        { "value": 82, "unitScale": 1, "tolerancePercent": 0, "label": "registros de 2024" }
+      ]
+    }
+  ],
+  "rubric": {
+    "disclaimer": "La puntuación evalúa completitud, soporte en la referencia y controles explícitos de viabilidad; no determina la verdad semántica ni garantiza que una estrategia funcione.",
+    "internalDataTerms": ["ventas", "ingresos", "costos", "coste", "margen", "inventario", "stock", "producción", "defectos", "devoluciones", "entregas", "clientes", "sucursal", "región", "regional", "canal"],
+    "measurableTerms": ["%", "porcentaje", "días", "dias", "mes", "meses", "unidades", "pares", "bolivianos", "bob", "usd", "tasa", "índice", "indice", "margen", "rotación", "rotacion", "meta", "kpi"],
+    "timeTerms": ["mes", "meses", "año", "años", "anual", "trimestre", "semanal", "semanas", "día", "días", "2027", "2028", "2029"],
+    "ownerTerms": ["gerencia", "finanzas", "comercial", "ventas", "producción", "produccion", "logística", "logistica", "inventario", "calidad", "marketing", "responsable", "equipo", "sistemas"],
+    "mitigationTerms": ["control", "validación", "validacion", "capacitación", "capacitacion", "respaldo", "piloto", "auditoría", "auditoria", "revisión", "revision", "monitoreo", "plan"],
+    "evidenceTerms": ["dato", "datos", "evidencia", "excel", "fuente", "registro", "registros", "periodo", "periodos", "2020", "2021", "2022", "2023", "2024", "usd", "par", "pares", "import", "export"]
+  }
+}

@@ -2,6 +2,9 @@ node_modules/
 *.csv
 *.xls
 *.xlsx
+!plantillas/Plantilla_datos_para_MANACO_BI.xlsx
 *.xlsm
 data/
+!assets/data/
+!assets/data/caso-manaco-referencia.json
 .DS_Store

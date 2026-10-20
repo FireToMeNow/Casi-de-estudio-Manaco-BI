@@ -6,6 +6,8 @@ Aplicación estática para cargar, inspeccionar y preparar archivos comerciales 
 
 Abre `index.html` en un navegador moderno. Para evitar restricciones del navegador al cargar recursos, también puedes servir la carpeta con cualquier servidor estático local. La biblioteca SheetJS se obtiene desde jsDelivr; los archivos seleccionados permanecen en el navegador.
 
+Para preparar fuentes que activen los módulos de análisis, usa la [plantilla Excel de datos para MANACO BI](./plantillas/Plantilla_datos_para_MANACO_BI.xlsx). Es una estructura vacía, no contiene cifras reales ni simuladas; completa las hojas con datos verificados y consulta la pestaña **LEEME** antes de cargarla.
+
 1. Entra en **Preparación de datos** y selecciona un archivo `.xlsx`, `.xls` o `.csv`.
 2. Si el libro tiene varias hojas, selecciona la hoja que quieras inspeccionar.
 3. Revisa la vista previa, el diagnóstico y las filas vacías, duplicadas o con posibles agregados «Mundo».
@@ -14,6 +16,8 @@ Abre `index.html` en un navegador moderno. Para evitar restricciones del navegad
 6. En **Caso de estudio**, completa las cuatro estaciones, revisa la procedencia y el alcance, y descarga el informe integrador HTML (imprimible/guardable como PDF) y/o una copia JSON del trabajo.
 
 Se usa la primera fila no vacía como encabezado. Los nombres normalizados se proponen por separado y se usan en la exportación preparada; el informe conserva los encabezados originales y su correspondencia. El diagnóstico describe cálculos automáticos, no conclusiones comerciales.
+
+La plantilla contiene tres hojas analíticas independientes. Selecciona **Comercio** para el dashboard y pronósticos; usa al menos tres años completos, consecutivos y con ambos flujos para habilitar la línea base (cuatro o más años permiten revisar errores retrospectivos). Selecciona **Inventario** para movimientos y niveles de reposición; para alertas, filtra un solo periodo/fecha y registra una existencia y punto de reposición consistentes para cada producto y sucursal. Selecciona **VentasCostos** para rentabilidad; registra importes internos de ventas y costo de ventas en la misma moneda y escala. Comercio y VentasCostos usan una columna **Moneda**: selecciona una única divisa compatible y registra importes en unidades completas, no miles o millones. Completa país reportante, periodo y demás dimensiones en cada registro para evitar mezclar alcances. Los encabezados están alineados con los roles reconocidos por la app; no renombres las columnas sin revisar su detección.
 
 ## Ruta del caso de estudio
 
@@ -26,6 +30,12 @@ La vista **Caso de estudio** organiza los productos requeridos por el caso:
 - **Producto final:** informe HTML con el alcance de la fuente, tablas/gráficos disponibles, respuestas de las estaciones y nivel de completitud. Se puede imprimir o guardar como PDF desde el navegador. La copia JSON permite respaldar y volver a importar las respuestas.
 
 Las respuestas se guardan en el `localStorage` del navegador y no se envían al servidor. Descarga la copia JSON si necesitas trasladar el trabajo a otro dispositivo o navegador. La clasificación de procedencia es manual y debe verificarse con el diccionario/fuente original. Los agregados de valor se bloquean ante monedas mezcladas, datos de reportante incompletos o varios países reportantes sin un alcance único. La app no genera estimaciones financieras, decisiones ni datos de MANACO si el archivo no los contiene; los objetivos, supuestos y recomendaciones deben ser completados y validados por el equipo.
+
+### Validación automática de respuestas
+
+La Estación 2 puede contrastar afirmaciones descriptivas con [la referencia JSON derivada del Excel](./assets/data/caso-manaco-referencia.json). El archivo contiene agregados del libro del caso (240 registros, reportante España, 2020–2024), no filas personales ni información operativa de MANACO. La coincidencia de referencia se basa en esos metadatos de fuente; al filtrar periodos para explorar los datos, la revisión mantiene el alcance del libro completo. Si el navegador no puede cargar el JSON automáticamente —por ejemplo, al abrir `index.html` con `file://`— usa **Cargar referencia Excel** y selecciona ese archivo.
+
+La revisión detecta cifras de varios hechos conocidos, posibles atribuciones erróneas a MANACO y evalúa la completitud de los campos y señales explícitas de viabilidad (objetivos/KPI/plazos, responsables, riesgos, alternativas y seguimiento). La puntuación es una guía explicable, no una evaluación semántica, una garantía de veracidad ni una promesa de éxito estratégico: revisa las alertas y confirma cifras, líneas base, costos y supuestos con la fuente original y datos internos autorizados. La validación y sus alertas se incluyen en el informe ejecutivo; una copia JSON de respuestas no contiene datos ni modifica la referencia.
 
 ## Pruebas
 

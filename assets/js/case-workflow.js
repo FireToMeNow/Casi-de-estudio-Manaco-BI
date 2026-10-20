@@ -2,7 +2,7 @@
   'use strict';
 
   const storageKey = 'manaco-bi-case-workflow-v1';
-  const state = { values: {}, dataset: null, filters: { reportingCountry: '', period: '' } };
+  const state = { values: {}, dataset: null, reference: null, validation: null, filters: { reportingCountry: '', period: '' } };
   const requiredByStation = {
     estacion1: [],
     estacion2: [],
@@ -128,16 +128,17 @@
     container.innerHTML = `
       <div class="page-heading">
         <div><p class="eyebrow">APRENDIZAJE BASADO EN RETOS · 120 MIN</p><h1>Ruta del caso de estudio</h1><p class="heading-subtitle">Completa las cuatro estaciones y consolida una recomendación sustentada, señalando siempre qué es evidencia, hipótesis o dato faltante.</p></div>
-        <div class="case-actions"><button id="case-export-html" class="button button-primary" type="button">↓ Informe ejecutivo</button><button id="case-export-json" class="button button-secondary" type="button">↓ Copia de trabajo JSON</button><label class="button button-secondary case-import-button">↑ Importar copia<input id="case-import" type="file" accept=".json,application/json" hidden></label></div>
+        <div class="case-actions"><button id="case-export-html" class="button button-primary" type="button">↓ Informe ejecutivo</button><button id="case-export-json" class="button button-secondary" type="button">↓ Copia de trabajo JSON</button><label class="button button-secondary case-import-button">↑ Importar copia<input id="case-import" type="file" accept=".json,application/json" hidden></label><label class="button button-secondary case-import-button">Cargar referencia Excel<input id="case-reference-import" type="file" accept=".json,application/json" hidden></label></div>
       </div>
       <div class="case-privacy-note" role="status">El trabajo se guarda solo en este navegador. Los resultados externos no se atribuyen a MANACO; revisa alcance y supuestos antes de recomendar.</div>
       <div id="case-save-status" class="case-save-status" aria-live="polite"></div>
+      <div id="case-reference-status" class="case-reference-status" role="status" aria-live="polite"></div>
       <section id="case-source-context" class="case-source-context"></section>
       <nav class="case-station-nav" aria-label="Estaciones del caso">
         <a href="#estacion1">01 · Comprensión</a><a href="#estacion2">02 · Diagnóstico</a><a href="#estacion3">03 · Propuesta</a><a href="#estacion4">04 · Decisión</a><a href="#producto-final">Producto final</a>
       </nav>
       <section id="estacion1" class="case-station"><div class="case-station-title"><span>ESTACIÓN 1 · 20 MIN</span><h2>Comprensión y priorización del problema</h2><p>Registra hasta cinco problemas, su impacto, una pregunta analítica y qué datos se necesitan. No confundas contexto empresarial con evidencia medida.</p></div><div id="case-s1"></div></section>
-      <section id="estacion2" class="case-station"><div class="case-station-title"><span>ESTACIÓN 2 · 30 MIN</span><h2>Diagnóstico con Ciencia de Datos</h2><p>Inspecciona la fuente y completa tres hallazgos basados en evidencia, dos limitaciones y una pregunta estratégica. Consulta el Dashboard para gráficos y filtros.</p><a class="case-inline-link" href="#mercado" data-go="mercado">Abrir Dashboard ejecutivo →</a></div><div id="case-s2-source"></div><div id="case-s2"></div></section>
+      <section id="estacion2" class="case-station"><div class="case-station-title"><span>ESTACIÓN 2 · 30 MIN</span><h2>Diagnóstico con Ciencia de Datos</h2><p>Inspecciona la fuente y completa tres hallazgos basados en evidencia, dos limitaciones y una pregunta estratégica. Consulta el Dashboard para gráficos y filtros.</p><a class="case-inline-link" href="#mercado" data-go="mercado">Abrir Dashboard ejecutivo →</a></div><div id="case-s2-source"></div><div id="case-s2"></div><button id="case-validate" class="button button-primary case-validate-button" type="button">Validar respuestas y viabilidad</button><div id="case-validation-results" class="case-validation-results" aria-live="polite"></div></section>
       <section id="estacion3" class="case-station"><div class="case-station-title"><span>ESTACIÓN 3 · 30 MIN</span><h2>Diseño de la propuesta estratégica</h2><p>Define una solución viable, los datos y decisiones que apoya, tres objetivos SMART a tres años, KPI, responsables y dos riesgos con mitigación.</p></div><div id="case-s3"></div></section>
       <section id="estacion4" class="case-station"><div class="case-station-title"><span>ESTACIÓN 4 · 30 MIN</span><h2>Análisis financiero, mercado y decisión</h2><p>Compara dos alternativas, selecciona una, plantea una acción para un segmento y define tres indicadores. Si faltan costos o datos internos, documéntalo; no inventes cifras.</p></div><div id="case-s4"></div></section>
       <section id="producto-final" class="case-final"><div><p class="eyebrow">PRODUCTO FINAL · 10 MIN</p><h2>Informe integrador</h2><p>La descarga HTML reúne el alcance de los datos, las cuatro estaciones y la recomendación. Puedes abrirlo en el navegador e imprimirlo o guardarlo como PDF.</p><p class="case-completion-note">El porcentaje indica campos con texto, no evalúa la calidad, veracidad ni viabilidad de las respuestas. El equipo debe validar evidencia, supuestos, fuentes y metas.</p></div><div id="case-completion" class="case-completion"></div><button id="case-final-export" class="button button-primary" type="button">Generar informe ejecutivo descargable</button></section>
@@ -234,6 +235,10 @@
     }
     const summary = datasetSummary(dataset, state.filters);
     if (!summary) {
+      if (state.reference) {
+        state.validation = root.CaseAnswerValidator.validate(state.values, state.reference, null);
+        renderValidation();
+      }
       target.innerHTML = '<strong>No hay archivo cargado.</strong><p>Carga la base del caso en Preparación de datos. El flujo no utiliza resultados de ejemplo.</p>';
       document.getElementById('case-s2-source').innerHTML = '<div class="case-data-empty">Los indicadores y la tabla por flujo/categoría aparecerán al cargar un archivo.</div>';
       return;
@@ -254,6 +259,10 @@
     }).join('');
     const caseFilters = filterMarkup ? `<div class="case-filterbar">${filterMarkup}<p>Para calcular valor por par, elige un solo periodo. Si hay varios países reportantes, selecciona uno antes de comparar.</p></div>` : '';
     document.getElementById('case-s2-source').innerHTML = `${caseFilters}<div class="case-data-summary"><h3>Lectura calculada de la fuente</h3><div class="case-data-kpis"><div><span>Importaciones</span><strong>${escapeHtml(numberLabel(summary.imports, summary.currency))}</strong></div><div><span>Exportaciones</span><strong>${escapeHtml(numberLabel(summary.exports, summary.currency))}</strong></div><div><span>Valor por par</span><strong>${escapeHtml(numberLabel(summary.valuePerPair, summary.valuePerPair === null ? '' : `${summary.currency}/par`))}</strong></div><div><span>“Mundo” separado</span><strong>${summary.worldCount} filas</strong></div></div><p>${escapeHtml(pairNote)}</p><div class="case-table-wrap"><table><thead><tr><th>Flujo</th><th>Categoría</th><th>Valor</th><th>Cantidad (${escapeHtml(pairsUnit)})</th><th>Valor ponderado/par</th></tr></thead><tbody>${rows || '<tr><td colspan="5">No hay filas comparables para presentar por flujo/categoría.</td></tr>'}</tbody></table></div><details><summary>Diccionario inferido, calidad y limitaciones</summary><div class="case-table-wrap"><table><thead><tr><th>Columna</th><th>Tipo inferido</th><th>Únicos</th><th>Faltan</th></tr></thead><tbody>${qualityRows}</tbody></table></div><ul>${caveats}</ul><p>Filas vacías: ${summary.quality.emptyRows}. Filas implicadas en duplicados exactos: ${summary.quality.duplicateRows}. Filas “Mundo” excluidas del desglose: ${summary.worldCount}. Registros excluidos de indicadores: ${summary.excluded}. Los tipos son inferencias; valida contra el diccionario de datos.</p></details></div>`;
+    if (state.validation) {
+      state.validation = root.CaseAnswerValidator.validate(state.values, state.reference, datasetSummary(dataset));
+      renderValidation();
+    }
   }
 
   function stationCompletion(ids) {
@@ -275,6 +284,38 @@
     document.getElementById('case-completion').innerHTML = details;
   }
 
+  function renderValidation() {
+    const target = document.getElementById('case-validation-results');
+    if (!target) return;
+    if (!state.reference) {
+      target.innerHTML = '<p class="case-validation-empty">Referencia de evaluación no cargada. Usa “Cargar referencia Excel” y selecciona <code>assets/data/caso-manaco-referencia.json</code>.</p>';
+      return;
+    }
+    if (!state.validation) {
+      target.innerHTML = '<p class="case-validation-empty">Completa respuestas y pulsa “Validar respuestas y viabilidad”.</p>';
+      return;
+    }
+    const validation = state.validation;
+    const status = validation.status === 'strong' ? 'Revisión favorable' : validation.status === 'needs-review' ? 'Requiere revisión' : 'En progreso';
+    const criteria = validation.criteria.map((criterion) => `<li class="${criterion.passed ? 'is-pass' : 'is-review'}"><span>${criterion.passed ? '✓' : '!'}</span><div><strong>${escapeHtml(criterion.label)}</strong><small>${escapeHtml(criterion.detail)}</small></div><b>${numberLabel(criterion.earned)}/${numberLabel(criterion.points)}</b></li>`).join('');
+    const warnings = validation.warnings.length
+      ? `<ul class="case-validation-warnings">${validation.warnings.map((warning) => `<li class="severity-${escapeHtml(warning.severity)}">${escapeHtml(warning.message)}</li>`).join('')}</ul>`
+      : '<p class="case-validation-ok">No se detectaron alertas automáticas adicionales.</p>';
+    const matchedFacts = validation.criteria.find((criterion) => criterion.id === 'reference-facts')?.detail ?? '';
+    target.innerHTML = `<div class="case-validation-heading"><div><span class="eyebrow">REVISIÓN AUTOMÁTICA EXPLICABLE</span><h3>${escapeHtml(status)}</h3><p>${escapeHtml(matchedFacts)}</p></div><strong class="case-validation-score">${validation.score}<small>/100</small></strong></div><p class="case-validation-source">${validation.referenceMatched ? 'La fuente cargada coincide con la base de referencia del caso.' : 'La fuente cargada no coincide exactamente con la referencia; no se califican cifras del Excel.'}</p><ul class="case-validation-list">${criteria}</ul>${warnings}<p class="case-validation-disclaimer">${escapeHtml(validation.disclaimer)}</p>`;
+  }
+
+  function validateAnswers() {
+    if (!state.reference) {
+      state.validation = null;
+      renderValidation();
+      document.getElementById('case-reference-status').textContent = 'No se puede contrastar con el Excel hasta cargar el archivo de referencia.';
+      return;
+    }
+    state.validation = root.CaseAnswerValidator.validate(state.values, state.reference, datasetSummary(state.dataset));
+    renderValidation();
+  }
+
   function save() {
     try {
       root.localStorage.setItem(storageKey, JSON.stringify({ version: 1, values: state.values }));
@@ -283,9 +324,11 @@
       document.getElementById('case-save-status').textContent = `No se pudo guardar automáticamente (${error.message}). Descarga una copia JSON para no perder el trabajo.`;
     }
     renderCompletion();
+    if (state.reference) validateAnswers();
   }
 
   function collectReport() {
+    if (state.reference) validateAnswers();
     return {
       title: 'Caso de estudio MANACO · Informe integrador',
       generatedAt: new Date().toISOString(),
@@ -297,6 +340,7 @@
         estacion4: Object.fromEntries(station4Fields.map((field) => [field.label, state.values[field.id] || 'Pendiente']))
       },
       sourceClassification: sourceScopeLabels[state.values.s2_scope] || 'Pendiente de validar',
+      validation: state.validation,
       completion: Object.fromEntries(Object.entries(requiredByStation).map(([station, ids]) => [station, stationCompletion(ids)])),
       interpretationRule: 'Distinguir evidencia observada, hipótesis y datos faltantes. El comercio exterior de un país reportante no representa ventas ni rentabilidad de MANACO.'
     };
@@ -305,6 +349,13 @@
   function reportSection(title, entries) {
     const content = Object.entries(entries).map(([label, value]) => `<section><h3>${escapeHtml(label)}</h3><p>${escapeHtml(value).replace(/\n/g, '<br>')}</p></section>`).join('');
     return `<article><h2>${escapeHtml(title)}</h2>${content}</article>`;
+  }
+
+  function validationReportSection(validation) {
+    if (!validation) return '<article><h2>Validación automática</h2><p>No se cargó la referencia Excel; no se evaluaron las respuestas.</p></article>';
+    const rows = validation.criteria.map((criterion) => `<tr><td>${escapeHtml(criterion.label)}</td><td>${escapeHtml(criterion.detail)}</td><td>${numberLabel(criterion.earned)}/${numberLabel(criterion.points)}</td></tr>`).join('');
+    const warnings = validation.warnings.map((warning) => `<li>${escapeHtml(warning.message)}</li>`).join('');
+    return `<article><h2>Validación automática · ${validation.score}/100 · ${validation.referenceMatched ? 'referencia coincidente' : 'referencia no coincidente'}</h2><p>${escapeHtml(validation.disclaimer)}</p><table><thead><tr><th>Criterio</th><th>Resultado</th><th>Puntos</th></tr></thead><tbody>${rows}</tbody></table>${warnings ? `<h3>Alertas a revisar</h3><ul>${warnings}</ul>` : ''}</article>`;
   }
 
   function svgByMetric(source, metric, title, unit, requireCurrency = false) {
@@ -354,7 +405,7 @@
     const chartsHtml = source
       ? `<article><h2>Gráficos para la Estación 2</h2>${svgByMetric(source, 'value', 'Valor comercial por categoría y flujo', source.currency, true)}${svgByMetric(source, 'pairs', 'Cantidad de pares por categoría y flujo', 'pares')}</article>`
       : '';
-    const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${escapeHtml(report.title)}</title><style>body{font:15px/1.55 Arial,sans-serif;max-width:960px;margin:36px auto;padding:0 22px;color:#20251f}h1{font-size:28px}h2{border-bottom:2px solid #26735a;padding-bottom:7px;margin-top:34px}h3{font-size:16px;margin-bottom:4px}article{margin:24px 0}figure{margin:20px 0;padding:12px;border:1px solid #ddd;overflow-x:auto}figcaption{margin-bottom:8px}.warning{background:#fcf6e9;border-left:4px solid #c39847;padding:12px}table{border-collapse:collapse;width:100%;font-size:13px}th,td{text-align:left;padding:8px;border-bottom:1px solid #ddd}.print{position:fixed;right:20px;top:20px;padding:10px 15px}@media print{.print{display:none}body{margin:0 auto}}</style></head><body><button class="print" onclick="window.print()">Imprimir / Guardar como PDF</button><h1>${escapeHtml(report.title)}</h1><p>Generado: ${escapeHtml(new Date(report.generatedAt).toLocaleString('es-BO'))}</p><p><b>Regla de interpretación:</b> ${escapeHtml(report.interpretationRule)}</p>${sourceHtml}${chartsHtml}${reportSection('Estación 1 · Comprensión del caso', report.stations.estacion1)}${reportSection('Estación 2 · Diagnóstico', report.stations.estacion2)}${reportSection('Estación 3 · Propuesta estratégica', report.stations.estacion3)}${reportSection('Estación 4 · Análisis y recomendación', report.stations.estacion4)}<article><h2>Completitud del trabajo</h2><p>El porcentaje solo cuenta campos con texto; no evalúa calidad, exactitud, viabilidad ni aprobación docente.</p><ul>${Object.entries(report.completion).map(([station, value]) => `<li>${escapeHtml(station)}: ${value.complete}/${value.total} campos completados (${value.percent}%).</li>`).join('')}</ul></article></body></html>`;
+    const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${escapeHtml(report.title)}</title><style>body{font:15px/1.55 Arial,sans-serif;max-width:960px;margin:36px auto;padding:0 22px;color:#20251f}h1{font-size:28px}h2{border-bottom:2px solid #26735a;padding-bottom:7px;margin-top:34px}h3{font-size:16px;margin-bottom:4px}article{margin:24px 0}figure{margin:20px 0;padding:12px;border:1px solid #ddd;overflow-x:auto}figcaption{margin-bottom:8px}.warning{background:#fcf6e9;border-left:4px solid #c39847;padding:12px}table{border-collapse:collapse;width:100%;font-size:13px}th,td{text-align:left;padding:8px;border-bottom:1px solid #ddd}.print{position:fixed;right:20px;top:20px;padding:10px 15px}@media print{.print{display:none}body{margin:0 auto}}</style></head><body><button class="print" onclick="window.print()">Imprimir / Guardar como PDF</button><h1>${escapeHtml(report.title)}</h1><p>Generado: ${escapeHtml(new Date(report.generatedAt).toLocaleString('es-BO'))}</p><p><b>Regla de interpretación:</b> ${escapeHtml(report.interpretationRule)}</p>${sourceHtml}${chartsHtml}${validationReportSection(report.validation)}${reportSection('Estación 1 · Comprensión del caso', report.stations.estacion1)}${reportSection('Estación 2 · Diagnóstico', report.stations.estacion2)}${reportSection('Estación 3 · Propuesta estratégica', report.stations.estacion3)}${reportSection('Estación 4 · Análisis y recomendación', report.stations.estacion4)}<article><h2>Completitud del trabajo</h2><p>El porcentaje solo cuenta campos con texto; no evalúa calidad, exactitud, viabilidad ni aprobación docente.</p><ul>${Object.entries(report.completion).map(([station, value]) => `<li>${escapeHtml(station)}: ${value.complete}/${value.total} campos completados (${value.percent}%).</li>`).join('')}</ul></article></body></html>`;
     download(new Blob([html], { type: 'text/html;charset=utf-8' }), `${safeFileBase(state.dataset?.fileName)}_informe_manaco.html`);
   }
 
@@ -371,6 +422,44 @@
 
   function exportJson() {
     download(new Blob([JSON.stringify({ version: 1, values: state.values }, null, 2)], { type: 'application/json;charset=utf-8' }), 'caso_manaco_copia_trabajo.json');
+  }
+
+  function isValidReference(reference) {
+    return reference && reference.schemaVersion === 1 && reference.dataset &&
+      reference.dataset.reporter && Array.isArray(reference.dataset.periods) &&
+      Array.isArray(reference.facts) && reference.rubric &&
+      Array.isArray(reference.rubric.internalDataTerms);
+  }
+
+  function applyReference(reference, message) {
+    if (!isValidReference(reference)) throw new Error('El JSON no tiene la estructura de referencia MANACO esperada.');
+    state.reference = reference;
+    document.getElementById('case-reference-status').textContent = message;
+    validateAnswers();
+  }
+
+  async function loadReferenceFile(file) {
+    if (!file) return;
+    try {
+      const reference = JSON.parse(await file.text());
+      applyReference(reference, `Referencia cargada desde ${file.name}.`);
+    } catch (error) {
+      document.getElementById('case-reference-status').textContent = `No se pudo cargar la referencia: ${error.message}`;
+    }
+  }
+
+  async function loadDefaultReference() {
+    const status = document.getElementById('case-reference-status');
+    try {
+      if (typeof root.fetch !== 'function') throw new Error('Este navegador no permite cargar archivos locales por URL.');
+      const response = await root.fetch('assets/data/caso-manaco-referencia.json');
+      if (!response.ok) throw new Error(`Respuesta HTTP ${response.status}.`);
+      const reference = await response.json();
+      applyReference(reference, `Referencia verificada cargada: ${reference.provenance.file}.`);
+    } catch (error) {
+      status.textContent = `No se pudo cargar automáticamente la referencia (${error.message}). Usa “Cargar referencia Excel” y selecciona assets/data/caso-manaco-referencia.json.`;
+      renderValidation();
+    }
   }
 
   async function importJson(file) {
@@ -447,13 +536,21 @@
         event.target.value = '';
         importJson(file);
       }
+      if (event.target.id === 'case-reference-import') {
+        const file = event.target.files[0];
+        event.target.value = '';
+        loadReferenceFile(file);
+      }
     });
     container.addEventListener('click', (event) => {
       if (event.target.closest('#case-export-html, #case-final-export')) exportHtml();
       if (event.target.closest('#case-export-json')) exportJson();
+      if (event.target.closest('#case-validate')) validateAnswers();
     });
     state.dataset = getDataset();
     render();
+    renderValidation();
+    loadDefaultReference();
     root.CaseWorkflow = { refresh: () => { state.dataset = getDataset(); renderSource(state.dataset); } };
   }
 
