@@ -71,6 +71,19 @@ test('datos sintéticos: separa país reportante y socio comercial en filtros y 
   assert.deepEqual(result.periods.analyzed, ['2024']);
 });
 
+test('datos sintéticos: bloquea agregados cuando hay país reportante faltante', () => {
+  const headers = ['País reportante', 'País socio', 'Flujo', 'Valor USD', 'Periodo'];
+  const rows = [
+    ['Bolivia', 'Chile', 'Importaciones', 100, '2024'],
+    ['', 'Perú', 'Exportaciones', 50, '2024']
+  ];
+  const result = analyzeMarket(headers, rows);
+  assert.equal(result.diagnostics.reportingScopeAllowed, false);
+  assert.equal(result.totals.import, null);
+  assert.equal(result.totals.export, null);
+  assert.equal(result.counts.included, 0);
+});
+
 test('datos sintéticos: hallazgos informan valores calculados y respetan filtros', () => {
   const headers = ['País reportante', 'País socio', 'Flujo', 'Valor USD', 'Periodo'];
   const rows = [
@@ -255,6 +268,18 @@ test('datos sintéticos: rechaza roles ambiguos y textos numéricos con separado
   const commaAmbiguous = analyzeMarket(['País', 'Flujo', 'Valor USD'], [['País A', 'Importaciones', '1,234']]);
   assert.equal(commaAmbiguous.totals.import, null);
   assert.equal(commaAmbiguous.totals.missingValues, 1);
+});
+
+test('datos sintéticos: acepta precisión decimal de Excel sin reinterpretar separadores ambiguos', () => {
+  const headers = ['País', 'Flujo', 'Valor USD'];
+  const result = analyzeMarket(headers, [
+    ['País A', 'Importaciones', '62,576,674.409999996'],
+    ['País A', 'Exportaciones', '1.23456789'],
+    ['País A', 'Importaciones', '1.234']
+  ]);
+  assert.equal(result.totals.import, 62576674.409999996);
+  assert.equal(result.totals.export, 1.23456789);
+  assert.equal(result.totals.missingValues, 1);
 });
 
 test('datos sintéticos: con país ambiguo excluye Mundo y bloquea agregados mixtos', () => {

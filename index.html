@@ -16,6 +16,7 @@
     <script defer src="assets/js/market-analysis.js"></script>
     <script defer src="assets/js/business-modules.js"></script>
     <script defer src="assets/js/market-dashboard.js"></script>
+    <script defer src="assets/js/case-workflow.js"></script>
     <script defer src="assets/js/app.js"></script>
   </head>
   <body>
@@ -27,6 +28,7 @@
         </a>
         <div class="nav-label">ESPACIO DE TRABAJO</div>
         <nav class="nav-list">
+          <button class="nav-item" type="button" data-view="caso"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4zM8 8h8M8 12h8M8 16h5"/></svg></span>Caso de estudio</button>
           <button class="nav-item" type="button" data-view="inicio"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m3 10 9-7 9 7M5 9v12h5v-7h4v7h5V9"/></svg></span>Inicio</button>
           <button class="nav-item is-active" type="button" data-view="preparacion" aria-current="page"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5"/></svg></span>Preparación de datos</button>
           <button class="nav-item" type="button" data-view="calidad"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3 21 19H3L12 3ZM12 9v4M12 16h.01"/></svg></span>Calidad de datos</button>
@@ -109,6 +111,7 @@
         </section>
 
         <section class="page-view simple-view" data-page="inicio" hidden><p class="eyebrow">MANACO BI</p><h1>Inteligencia de negocios</h1><p class="heading-subtitle">Carga un archivo comercial para iniciar su preparación y validación.</p><button class="button button-primary" type="button" data-go="preparacion">Ir a preparación de datos →</button></section>
+        <section class="page-view case-workflow-view" data-page="caso" hidden><div id="case-workflow-root"></div></section>
         <section class="page-view simple-view" data-page="calidad" hidden><p class="eyebrow">DATOS · CALIDAD</p><h1>Calidad de datos</h1><p class="heading-subtitle">Este módulo muestra únicamente el diagnóstico calculado de la hoja cargada.</p><button class="button button-secondary" type="button" data-go="preparacion">Volver a preparación →</button><div id="quality-summary" class="quality-summary"></div></section>
         <section class="page-view market-view" data-page="mercado" hidden>
           <div class="page-heading market-page-heading">

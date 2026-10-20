@@ -50,14 +50,15 @@
       if (active) button.setAttribute('aria-current', 'page');
       else button.removeAttribute('aria-current');
     });
-    const labels = { inicio: 'Inicio', preparacion: 'Preparación de datos', calidad: 'Calidad de datos', mercado: 'Dashboard ejecutivo', ...moduleTitles };
+    const labels = { inicio: 'Inicio', caso: 'Caso de estudio', preparacion: 'Preparación de datos', calidad: 'Calidad de datos', mercado: 'Dashboard ejecutivo', ...moduleTitles };
     elements['breadcrumb-current'].textContent = labels[view] || 'Preparación de datos';
-    const stages = { mercado: 'ETAPA 03', inventarios: 'ETAPA 04', pronosticos: 'ETAPA 05', rentabilidad: 'ETAPA 06' };
+    const stages = { caso: 'CASO ABR', mercado: 'ESTACIÓN 02', inventarios: 'ETAPA 04', pronosticos: 'ETAPA 05', rentabilidad: 'ETAPA 06' };
     const stage = stages[view] || 'ETAPA 01';
     elements['stage-tag'].textContent = stage;
-    elements['footer-stage'].textContent = `${stage} · ${view === 'mercado' ? 'DASHBOARD EJECUTIVO' : moduleTitles[view] || 'PREPARACIÓN Y CALIDAD'}`;
+    elements['footer-stage'].textContent = `${stage} · ${view === 'caso' ? 'ESTACIONES 01–04' : view === 'mercado' ? 'DIAGNÓSTICO' : moduleTitles[view] || 'PREPARACIÓN Y CALIDAD'}`;
     if (view === 'calidad') renderQualitySummary();
     if (view === 'mercado') window.MarketDashboard.refresh();
+    if (view === 'caso') window.CaseWorkflow.refresh();
     if (moduleTitles[view]) window.BusinessModules.render(view, getCurrentDataset());
   }
 
@@ -272,6 +273,10 @@
     });
     elements['export-button'].addEventListener('click', exportPrepared);
     elements['report-button'].addEventListener('click', exportReport);
+    document.querySelectorAll('a[data-go]').forEach((link) => link.addEventListener('click', (event) => {
+      event.preventDefault();
+      setView(link.dataset.go);
+    }));
     document.querySelectorAll('.nav-item[data-view]').forEach((button) => button.addEventListener('click', () => setView(button.dataset.view)));
     document.querySelectorAll('[data-go]').forEach((button) => button.addEventListener('click', () => setView(button.dataset.go)));
     elements['drop-zone'].addEventListener('dragover', (event) => { event.preventDefault(); elements['drop-zone'].classList.add('is-dragging'); });
@@ -286,6 +291,7 @@
   function init() {
     cacheElements();
     window.MarketDashboard.initialize(getCurrentDataset);
+    window.CaseWorkflow.initialize(getCurrentDataset);
     bindEvents();
   }
 

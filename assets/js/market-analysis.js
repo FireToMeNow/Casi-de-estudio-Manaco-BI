@@ -106,8 +106,9 @@
     const text = value.trim().replace(/[\u00a0\u202f ]/g, '');
     if (!text) return null;
     if (/^-?\d+$/.test(text)) return Number(text);
-    if (/^-?\d{1,3}(?:,\d{3})+\.\d{1,2}$/.test(text)) return Number(text.replace(/,/g, ''));
+    if (/^-?\d{1,3}(?:,\d{3})+\.\d+$/.test(text)) return Number(text.replace(/,/g, ''));
     if (/^-?\d+\.\d{1,2}$/.test(text)) return Number(text);
+    if (/^-?\d+\.\d{4,}$/.test(text)) return Number(text);
     if (/^-?\d+,\d{1,2}$/.test(text)) return Number(text.replace(',', '.'));
     return null;
   }
@@ -172,8 +173,9 @@
       ? new Set(filterMatches.map(({ row }) => String(row[schema.reportingCountry.index] ?? '').trim()).filter(Boolean))
       : new Set();
     const reportingRoleAmbiguous = schema.ambiguities.some((ambiguity) => ambiguity.role === 'reportingCountry');
+    const reportingCountryComplete = !schema.reportingCountry || filterMatches.every(({ row }) => String(row[schema.reportingCountry.index] ?? '').trim() !== '');
     const reportingScopeAllowed = !reportingRoleAmbiguous &&
-      (!schema.reportingCountry || Boolean(filters.reportingCountry) || reportingCountryValues.size <= 1);
+      (!schema.reportingCountry || Boolean(filters.reportingCountry) || (reportingCountryValues.size <= 1 && reportingCountryComplete));
     const worldMode = filters.worldMode === 'world' ? 'world' : 'detailed';
     const ambiguousCountryHeaders = schema.ambiguities.find((ambiguity) => ambiguity.role === 'country')?.headers ?? [];
     const countryCandidateIndexes = schema.country
@@ -370,6 +372,7 @@
       valuePerPair: pairValue,
       partners,
       timeSeries,
+      flowRecords,
       recordsIncluded: canAggregateValues ? validRecords : [],
       recordsByPartnerAndFlow,
       validRecords,
@@ -377,6 +380,7 @@
       diagnostics: {
         hasFlow: Boolean(schema.flow),
         reportingScopeAllowed,
+        reportingCountryComplete,
         reportingRoleAmbiguous,
         worldScopeAllowed,
         countryRoleAmbiguous,
