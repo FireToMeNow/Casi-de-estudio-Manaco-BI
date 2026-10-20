@@ -28,7 +28,9 @@ Las pruebas usan filas sintéticas declaradas en los archivos de `tests/`; no re
 
 ## Inteligencia de mercado
 
-El módulo usa los encabezados reales de la hoja cargada y presenta la columna detectada para cada rol. Incluye tarjetas KPI, líneas de evolución anual, barras de importaciones y exportaciones, barras horizontales de los diez principales socios y una dona del valor comercial por producto/categoría. Los gráficos se actualizan al cambiar filtros o la hoja y solo se dibujan cuando la unidad monetaria es comparable y los datos disponibles respaldan la visualización. Sin una columna de producto, se explica por qué no está disponible el gráfico de categorías.
+El módulo usa los encabezados reales de la hoja cargada y presenta la columna detectada para cada rol. Incluye tarjetas KPI, líneas de evolución anual, barras de importaciones y exportaciones, barras horizontales de los diez principales socios, una dona del valor comercial por producto/categoría y barras del valor ponderado por par según categoría y flujo. Este último gráfico requiere pares explícitos, moneda confirmada y un único periodo válido (selecciona un año si la hoja contiene varios). Los gráficos se actualizan al cambiar filtros o la hoja y solo se dibujan cuando la unidad monetaria es comparable y los datos disponibles respaldan la visualización. Sin una columna de producto, se explica por qué no está disponible el gráfico de categorías.
+
+Cuando varias columnas pueden representar un mismo rol, se prioriza el encabezado con coincidencia más específica; si dos o más encabezados tienen la misma prioridad, el rol permanece ambiguo y requiere revisión manual. Por ejemplo, `Valor_USD` se prefiere a `Valor_miles_USD` y `Valor_USD_por_par` como valor comercial.
 
 Los filtros de periodo/año, país reportante, socio comercial, flujo y producto/categoría aparecen solo cuando existen columnas reconocidas. La serie temporal agrupa por año los periodos compatibles, incluidos meses, trimestres y fechas. Si varios encabezados encajan con un rol, se marcan como ambiguos y no se escoge uno automáticamente.
 

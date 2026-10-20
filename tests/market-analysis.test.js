@@ -27,6 +27,21 @@ test('datos sintéticos: detecta roles solo en encabezados presentes y lista col
   assert.equal(resolveSchema(['Columna sin clasificar']).country, undefined);
 });
 
+test('datos del caso Manaco: prefiere valor USD frente a columnas derivadas o en miles', () => {
+  const headers = [
+    'País_reportante', 'Flujo_comercial', 'Año', 'Código_SA6', 'Categoría_calzado',
+    'Socio_comercial', 'Valor_miles_USD', 'Cantidad_pares', 'Valor_USD', 'Valor_USD_por_par'
+  ];
+  const schema = resolveSchema(headers);
+  assert.equal(schema.value.header, 'Valor_USD');
+  assert.equal(schema.headerCurrency, 'USD');
+  assert.equal(schema.quantity.header, 'Cantidad_pares');
+  assert.equal(schema.pairsCompatible, true);
+  assert.equal(schema.product.header, 'Categoría_calzado');
+  assert.equal(schema.country.header, 'Socio_comercial');
+  assert.equal(schema.ambiguities.some((ambiguity) => ambiguity.role === 'value'), false);
+});
+
 test('datos sintéticos: separa país reportante y socio comercial en filtros y resultados', () => {
   const headers = ['País reportante', 'País socio', 'Flujo', 'Valor USD', 'Periodo'];
   const rows = [
@@ -108,7 +123,8 @@ test('datos sintéticos: calcula saldo cuando importaciones y exportaciones cubr
   assert.equal(result.periods.comparable, true);
   assert.equal(result.totals.balance, 21);
   assert.equal(result.diagnostics.canCompareFlows, true);
-  assert.equal(result.diagnostics.partnersComparable, false);
+  assert.equal(result.diagnostics.partnersComparable, true);
+  assert.equal(result.partners[0].country, 'País A');
 });
 
 test('datos sintéticos: mantiene Mundo fuera del desglose y permite inspección separada', () => {

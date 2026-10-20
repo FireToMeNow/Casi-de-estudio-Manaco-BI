@@ -33,13 +33,23 @@
         if (role === 'country' && aliases.reportingCountry.some((alias) => header === alias || header.includes(alias))) return;
         for (const alias of roleAliases) {
           const match = header === alias || header.includes(alias);
-          if (match) candidates.push({ index, header: String(headers[index] ?? ''), score: header === alias ? 1000 : alias.length });
+          if (match) {
+            const score = header === alias ? 1000 : alias.length;
+            const existing = candidates.find((candidate) => candidate.index === index);
+            if (!existing || score > existing.score) {
+              if (existing) candidates.splice(candidates.indexOf(existing), 1);
+              candidates.push({ index, header: String(headers[index] ?? ''), score });
+            }
+          }
         }
       });
-      const byColumn = new Map(candidates.map((candidate) => [candidate.index, candidate]));
-      const uniqueCandidates = [...byColumn.values()];
-      if (uniqueCandidates.length === 1) schema[role] = uniqueCandidates[0];
-      else if (uniqueCandidates.length > 1) ambiguities.push({ role, headers: uniqueCandidates.map((candidate) => candidate.header) });
+      if (candidates.length === 1) schema[role] = candidates[0];
+      else if (candidates.length > 1) {
+        const bestScore = Math.max(...candidates.map((candidate) => candidate.score));
+        const bestCandidates = candidates.filter((candidate) => candidate.score === bestScore);
+        if (bestCandidates.length === 1) schema[role] = bestCandidates[0];
+        else ambiguities.push({ role, headers: bestCandidates.map((candidate) => candidate.header) });
+      }
     }
     const quantityHeader = schema.quantity ? normalizedHeaders[schema.quantity.index] : '';
     schema.pairsCompatible = Boolean(
@@ -249,7 +259,9 @@
     );
     const canCompareTotals = canAggregateValues && comparableUnit && periodsComparable && !filters.flow;
     const canCalculateBalance = canCompareTotals && importRecordCount > 0 && exportRecordCount > 0;
-    const partnersComparable = canAggregateValues && comparableUnit && partnerPeriodComparable;
+    const partnersComparable = canAggregateValues && comparableUnit && (filters.flow
+      ? validRecords.every((record) => record.period !== null)
+      : periodsComparable);
 
     const partnerGroups = new Map();
     if (canAggregateValues && schema.country) {

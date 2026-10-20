@@ -208,18 +208,32 @@
     const chartAvailable = Boolean(window.Chart);
     const selectedFlow = analysis.classifyFlow(result.filters.flow);
     const categories = new Map();
+    const pairCategories = new Map();
     if (result.schema.product && Number.isInteger(result.schema.product.index)) {
       for (const record of result.recordsIncluded) {
         const category = String(record.row[result.schema.product.index] ?? '').trim();
         if (!category || record.value === null || record.value < 0) continue;
         categories.set(category, (categories.get(category) ?? 0) + record.value);
+        if (record.pairs === null || record.pairs <= 0) continue;
+        const group = pairCategories.get(category) ?? {
+          importValue: 0, importPairs: 0, exportValue: 0, exportPairs: 0
+        };
+        if (record.flow === 'import') {
+          group.importValue += record.value;
+          group.importPairs += record.pairs;
+        } else if (record.flow === 'export') {
+          group.exportValue += record.value;
+          group.exportPairs += record.pairs;
+        }
+        pairCategories.set(category, group);
       }
     }
     $('market-flow-card').hidden = !(supported && result.diagnostics.canCompareFlows && !selectedFlow && result.diagnostics.hasFlow && result.diagnostics.hasValue);
     $('market-partner-card').hidden = !(supported && result.diagnostics.partnersComparable && result.diagnostics.hasCountry && result.partners.length);
     $('market-period-card').hidden = !(supported && result.diagnostics.hasPeriod && result.timeSeries.length);
     $('market-category-card').hidden = !(supported && result.diagnostics.hasProduct && categories.size);
-    for (const key of ['flow', 'partner', 'period', 'category']) destroyChart(key);
+    $('market-pair-card').hidden = !(supported && result.schema.pairsCompatible && result.diagnostics.pairPeriodComparable && pairCategories.size);
+    for (const key of ['flow', 'partner', 'period', 'category', 'pair']) destroyChart(key);
     if (!supported || !chartAvailable) {
       if (!chartAvailable) $('market-alerts').insertAdjacentHTML('beforeend', '<p>No se cargó Chart.js; los gráficos no están disponibles. Comprueba la conexión e inténtalo de nuevo; los datos de la hoja no se han modificado.</p>');
       return;
@@ -275,6 +289,31 @@
         options: { responsive: true, maintainAspectRatio: false, cutout: '64%', plugins: { ...chartOptions().plugins, tooltip: { callbacks: { label: (context) => `${context.label}: ${formatNumber(context.parsed)} ${result.units.label}` } } } }
       });
       $('market-category-chart-note').textContent = `${categoryValues.length} categorías con valores comerciales no negativos incluidos; la distribución respeta los filtros activos.`;
+    }
+    if (!$('market-pair-card').hidden) {
+      const pairRows = [...pairCategories.entries()].sort((a, b) => {
+        const totalA = a[1].importValue + a[1].exportValue;
+        const totalB = b[1].importValue + b[1].exportValue;
+        return totalB - totalA || a[0].localeCompare(b[0], 'es');
+      });
+      const flowDatasets = [
+        { key: 'import', label: 'Importaciones', valueKey: 'importValue', pairsKey: 'importPairs', color: colors.imports },
+        { key: 'export', label: 'Exportaciones', valueKey: 'exportValue', pairsKey: 'exportPairs', color: colors.exports }
+      ].filter((flow) => !selectedFlow || selectedFlow === flow.key);
+      state.charts.pair = new Chart($('market-pair-chart'), {
+        type: 'bar',
+        data: {
+          labels: pairRows.map(([category]) => category),
+          datasets: flowDatasets.map((flow) => ({
+            label: flow.label,
+            data: pairRows.map(([, values]) => values[flow.pairsKey] > 0 ? values[flow.valueKey] / values[flow.pairsKey] : null),
+            backgroundColor: flow.color,
+            borderRadius: 2
+          }))
+        },
+        options: chartOptions()
+      });
+      $('market-pair-chart-note').textContent = `Valor total / pares totales; unidad ${result.units.label}/par. Se requiere un solo periodo válido; el gráfico respeta los filtros activos.`;
     }
   }
 
