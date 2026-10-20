@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#f5f5ef">
+    <meta name="theme-color" content="#10233f">
     <meta name="description" content="Preparación local de datos, análisis comercial e indicadores de negocios para MANACO BI.">
     <title>MANACO BI | Inteligencia de negocios</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -23,20 +23,20 @@
       <aside class="sidebar" aria-label="Navegación principal">
         <a class="brand" href="#inicio" aria-label="MANACO BI, inicio">
           <span class="brand-mark" aria-hidden="true">M</span>
-          <span class="brand-copy"><strong>MANACO</strong><small>INTELIGENCIA DE NEGOCIOS</small></span>
+          <span class="brand-copy"><strong>MANACO BI</strong><small>INTELIGENCIA DE NEGOCIOS</small></span>
         </a>
         <div class="nav-label">ESPACIO DE TRABAJO</div>
         <nav class="nav-list">
-          <button class="nav-item" type="button" data-view="inicio"><span class="nav-icon" aria-hidden="true">⌂</span>Inicio</button>
-          <button class="nav-item is-active" type="button" data-view="preparacion" aria-current="page"><span class="nav-icon" aria-hidden="true">▤</span>Preparación de datos</button>
-          <button class="nav-item" type="button" data-view="calidad"><span class="nav-icon" aria-hidden="true">◫</span>Calidad de datos</button>
-          <button class="nav-item" type="button" data-view="mercado"><span class="nav-icon" aria-hidden="true">▥</span>Dashboard ejecutivo</button>
+          <button class="nav-item" type="button" data-view="inicio"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m3 10 9-7 9 7M5 9v12h5v-7h4v7h5V9"/></svg></span>Inicio</button>
+          <button class="nav-item is-active" type="button" data-view="preparacion" aria-current="page"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5"/></svg></span>Preparación de datos</button>
+          <button class="nav-item" type="button" data-view="calidad"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3 21 19H3L12 3ZM12 9v4M12 16h.01"/></svg></span>Calidad de datos</button>
+          <button class="nav-item" type="button" data-view="mercado"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19V5M4 19h17M8 16v-5h3v5M14 16V8h3v8M19 16V4h2"/></svg></span>Dashboard ejecutivo</button>
         </nav>
         <div class="nav-label nav-label-spaced">ANÁLISIS</div>
         <nav class="nav-list" aria-label="Módulos de análisis">
-          <button class="nav-item" type="button" data-view="inventarios"><span class="nav-icon" aria-hidden="true">▦</span>Inventarios</button>
-          <button class="nav-item" type="button" data-view="pronosticos"><span class="nav-icon" aria-hidden="true">⌁</span>Pronósticos</button>
-          <button class="nav-item" type="button" data-view="rentabilidad"><span class="nav-icon" aria-hidden="true">◷</span>Rentabilidad</button>
+          <button class="nav-item" type="button" data-view="inventarios"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></svg></span>Inventarios</button>
+          <button class="nav-item" type="button" data-view="pronosticos"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m3 17 6-6 4 3 8-9M15 5h6v6"/></svg></span>Pronósticos</button>
+          <button class="nav-item" type="button" data-view="rentabilidad"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3v18M17 7H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>Rentabilidad</button>
         </nav>
         <div class="sidebar-foot"><span class="local-dot"></span>Procesamiento local<br><small>Los archivos no salen de este dispositivo</small></div>
       </aside>
@@ -61,7 +61,7 @@
                 <h2>Selecciona un archivo para comenzar</h2>
                 <p>Arrastra un archivo aquí o búscalo en tu dispositivo</p>
                 <button id="browse-button" class="button button-primary" type="button"><span aria-hidden="true">＋</span>Seleccionar archivo</button>
-                <div class="file-formats">XLSX <i></i> XLS <i></i> CSV <span>·</span> Hasta donde permita la memoria del navegador</div>
+                <div class="file-formats">XLSX <i></i> XLS <i></i> CSV <span>·</span> Archivos procesados localmente, sujetos a la memoria disponible</div>
               </div>
 
               <div id="error-banner" class="error-banner" role="alert" hidden></div>

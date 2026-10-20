@@ -203,7 +203,7 @@
       return;
     }
     if (!result.totals.importRecords && !result.totals.exportRecords) return;
-    const colors = { imports: '#26735a', exports: '#c4664e' };
+    const colors = { imports: '#2869bb', exports: '#38a58e' };
     if (!$('market-flow-card').hidden) {
       state.charts.flow = new Chart($('market-flow-chart'), {
         type: 'bar',
